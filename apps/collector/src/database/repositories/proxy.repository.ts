@@ -87,7 +87,7 @@ export class ProxyRepository extends BaseRepository {
       }>;
       return rows.map(row => ({
         ...row, domains: row.domains ? row.domains.split(',').filter(Boolean) : [], chains: [chain],
-        asn: row.asn || undefined, geoIP: row.geoIP ? JSON.parse(row.geoIP).filter(Boolean) : undefined,
+        asn: row.asn || undefined, geoIP: row.geoIP ? JSON.parse(row.geoIP) : undefined,
       })) as IPStats[];
     }
 

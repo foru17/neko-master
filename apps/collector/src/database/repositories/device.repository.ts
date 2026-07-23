@@ -100,7 +100,7 @@ export class DeviceRepository extends BaseRepository {
         const chains = row.chains ? row.chains.split(',').filter(Boolean) : [];
         return {
           ...row, domains: row.domains ? row.domains.split(',').filter(Boolean) : [],
-          geoIP: row.geoIP ? JSON.parse(row.geoIP).filter(Boolean) : undefined, asn: row.asn || undefined,
+          geoIP: row.geoIP ? JSON.parse(row.geoIP) : undefined, asn: row.asn || undefined,
           chains: this.expandShortChainsForRules(backendId, chains, rules),
         };
       }) as IPStats[];
@@ -121,7 +121,7 @@ export class DeviceRepository extends BaseRepository {
     const result = stmt.all(backendId, sourceIP, limit) as any[];
     return result.map(r => ({
       ...r, domains: r.domains ? r.domains.split(',') : [],
-      geoIP: r.geoIP ? JSON.parse(r.geoIP).filter(Boolean) : undefined, asn: r.asn || undefined,
+      geoIP: r.geoIP ? JSON.parse(r.geoIP) : undefined, asn: r.asn || undefined,
     }));
   }
 }

@@ -59,7 +59,7 @@ export class IPRepository extends BaseRepository {
         const chains = row.chains ? row.chains.split(',').filter(Boolean) : [];
         return {
           ...row, domains: row.domains ? row.domains.split(',').filter(Boolean) : [],
-          geoIP: row.geoIP ? JSON.parse(row.geoIP).filter(Boolean) : undefined,
+          geoIP: row.geoIP ? JSON.parse(row.geoIP) : undefined,
           asn: row.asn || undefined,
           chains: this.expandShortChainsForRules(backendId, chains, rules),
         };
@@ -84,7 +84,7 @@ export class IPRepository extends BaseRepository {
 
     return rows.map(row => ({
       ...row, domains: row.domains ? row.domains.split(',') : [],
-      geoIP: row.geoIP ? JSON.parse(row.geoIP).filter(Boolean) : undefined,
+      geoIP: row.geoIP ? JSON.parse(row.geoIP) : undefined,
       asn: row.asn || undefined, chains: row.chains ? row.chains.split(',') : [],
     })) as IPStats[];
   }
@@ -154,7 +154,7 @@ export class IPRepository extends BaseRepository {
 
     return rows.map(row => ({
       ...row, domains: row.domains ? row.domains.split(',') : [],
-      geoIP: row.geoIP ? JSON.parse(row.geoIP).filter(Boolean) : undefined,
+      geoIP: row.geoIP ? JSON.parse(row.geoIP) : undefined,
       asn: row.asn || undefined, chains: row.chains ? row.chains.split(',') : [],
     })) as IPStats[];
   }
@@ -232,7 +232,7 @@ export class IPRepository extends BaseRepository {
           ip: row.ip, domains: row.domains ? row.domains.split(',').filter(Boolean) : [],
           totalUpload: row.totalUpload, totalDownload: row.totalDownload,
           totalConnections: row.totalConnections, lastSeen: row.lastSeen,
-          geoIP: row.geoIP ? JSON.parse(row.geoIP).filter(Boolean) : undefined,
+          geoIP: row.geoIP ? JSON.parse(row.geoIP) : undefined,
           asn: row.asn || undefined,
           chains: this.expandShortChainsForRules(backendId, chains, rules),
         };
@@ -272,7 +272,7 @@ export class IPRepository extends BaseRepository {
         ip: row.ip, domains: row.domains ? row.domains.split(',') : [],
         totalUpload: row.totalUpload, totalDownload: row.totalDownload,
         totalConnections: row.totalConnections, lastSeen: row.lastSeen,
-        geoIP: row.geoIP ? JSON.parse(row.geoIP).filter(Boolean) : undefined,
+        geoIP: row.geoIP ? JSON.parse(row.geoIP) : undefined,
         asn: row.asn || undefined,
         chains: this.expandShortChainsForRules(backendId, chains, rules),
       };
@@ -330,7 +330,7 @@ export class IPRepository extends BaseRepository {
         const chains = row.chains ? row.chains.split(',').filter(Boolean) : [];
         return {
           ...row, domains: row.domains ? row.domains.split(',').filter(Boolean) : [],
-          geoIP: row.geoIP ? JSON.parse(row.geoIP).filter(Boolean) : undefined,
+          geoIP: row.geoIP ? JSON.parse(row.geoIP) : undefined,
           asn: row.asn || undefined,
           chains: this.expandShortChainsForRules(backendId, chains, rules),
         };
