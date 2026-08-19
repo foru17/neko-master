@@ -496,7 +496,7 @@ export function createSurgeCollector(
           : isIP(remoteAddress)
             ? remoteAddress
             : "";
-        const sourceIP = req.localAddress || "";
+        const sourceIP = req.sourceAddress || req.localAddress || "";
 
         // For Surge:
         // - policyName = final proxy (e.g., "🇺🇸 US-SJC-IEPL")

@@ -279,7 +279,7 @@ func (c *Client) collectSurge(ctx context.Context) ([]domain.FlowSnapshot, error
 			ip = extractHost(remoteAddress)
 		}
 
-		sourceIP := extractHost(defaultString(strings.TrimSpace(reqItem.LocalAddress), strings.TrimSpace(reqItem.SourceAddress)))
+		sourceIP := extractHost(defaultString(strings.TrimSpace(reqItem.SourceAddress), strings.TrimSpace(reqItem.LocalAddress)))
 		chains := convertSurgeChains(reqItem.PolicyName, reqItem.OriginalPolicyName, []string(reqItem.Notes))
 		rule := defaultString(strings.TrimSpace(lastChain(chains)), defaultString(strings.TrimSpace(reqItem.OriginalPolicyName), "Match"))
 		rulePayload := strings.TrimSpace(reqItem.Rule)
