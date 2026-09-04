@@ -87,6 +87,21 @@ export class AuthService {
       return { valid: true };
     }
 
+    // WebSocket authentication reads the raw Cookie header, where values set by
+    // @fastify/cookie may still be percent-encoded. Keep the original check
+    // above for backwards compatibility, then retry with the decoded value.
+    try {
+      const decodedToken = decodeURIComponent(token);
+      if (decodedToken !== token) {
+        const decodedTokenHash = await hashToken(decodedToken);
+        if (await timingSafeHashEqual(decodedTokenHash, config.tokenHash)) {
+          return { valid: true };
+        }
+      }
+    } catch {
+      // Malformed percent-encoding is simply treated as an invalid token.
+    }
+
     return { valid: false, message: 'Invalid token' };
   }
 

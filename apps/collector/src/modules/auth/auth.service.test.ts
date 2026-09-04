@@ -36,6 +36,17 @@ describe('AuthService', () => {
       expect(result.valid).toBe(true);
     });
 
+    it('should verify URL-encoded session tokens', async () => {
+      const token = 'abc1+/=';
+      await authService.enableAuth(token);
+
+      const encodedToken = encodeURIComponent(token);
+      expect(encodedToken).toBe('abc1%2B%2F%3D');
+
+      const result = await authService.verifyToken(encodedToken);
+      expect(result.valid).toBe(true);
+    });
+
     it('should reject incorrect token', async () => {
       await authService.enableAuth('correct1');
 
