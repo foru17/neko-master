@@ -1,6 +1,11 @@
 # Clash Master - Multi-stage Docker Build
 FROM node:22-alpine AS base
 
+# Use a China-friendly npm registry mirror (registry.npmjs.org is unreliable
+# from CN networks); remove these lines if you build outside China.
+ENV NPM_CONFIG_REGISTRY=https://registry.npmmirror.com \
+    COREPACK_NPM_REGISTRY=https://registry.npmmirror.com
+
 # Install pnpm and build tools for native modules
 RUN apk add --no-cache python3 make g++ gcc && \
     npm install -g pnpm@9.15.9

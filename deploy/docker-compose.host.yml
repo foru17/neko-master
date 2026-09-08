@@ -1,0 +1,19 @@
+services:
+  neko-master:
+    image: neko-master:custom
+    container_name: neko-master
+    restart: unless-stopped
+    # host-gateway: 无论 docker 网络怎么重建, 容器内始终可用 host.docker.internal 访问宿主机
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "3000:3000"   # Web UI
+      - "3002:3002"   # WebSocket (real-time stats)
+    volumes:
+      - ./data:/app/data
+    environment:
+      - NODE_ENV=production
+      - DB_PATH=/app/data/stats.db
+      - COOKIE_SECRET=${COOKIE_SECRET}
+      # 宿主执行器地址(节点热更新/服务端管理的执行后端)
+      - NODE_TOOL_URL=http://host.docker.internal:8008

@@ -18,6 +18,11 @@ import {
   X,
   ShieldAlert,
   HeartPulse,
+  PlugZap,
+  ServerCog,
+  ListTree,
+  Radar,
+  Wrench,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -53,6 +58,11 @@ const NAV_ITEMS = [
   { id: "proxies", icon: Server },
   { id: "devices", icon: Smartphone },
   { id: "health", icon: HeartPulse },
+  { id: "nodes", icon: PlugZap },
+  { id: "daemon", icon: ServerCog },
+  { id: "rulecfg", icon: ListTree },
+  { id: "diag", icon: Radar },
+  { id: "ops", icon: Wrench },
 ];
 
 export function Navigation({

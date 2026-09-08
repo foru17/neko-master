@@ -1,0 +1,22 @@
+[Unit]
+Description=mihomo Node Hot-Update / Daemon Manager (host executor for Neko Master)
+After=network.target
+Wants=mihomo.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/mihomo-node-tool/server.py
+WorkingDirectory=/opt/mihomo-node-tool
+Environment=MIHOMO_CONFIG=/root/.config/mihomo/config.yaml
+Environment=MIHOMO_API=http://127.0.0.1:9090
+Environment=TOOL_PORT=8008
+# 有 HTTP 代理时取消注释(下载 mihomo/clash 二进制用)
+# Environment=HTTP_PROXY=http://10.0.0.1:1080
+# Environment=HTTPS_PROXY=http://10.0.0.1:1080
+# Environment=NO_PROXY=localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+Environment=DAEMON_BACKUP_DIR=/var/lib/neko-host-tool/backups
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

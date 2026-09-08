@@ -23,6 +23,7 @@ import { BackendService, backendController } from '../backend/index.js';
 import { StatsService, statsController } from '../stats/index.js';
 import { AuthService, authController } from '../auth/index.js';
 import { configController } from '../config/index.js';
+import nodemgrController from '../nodemgr/index.js';
 
 // Extend Fastify instance to include services
 declare module 'fastify' {
@@ -1378,6 +1379,7 @@ export async function createApp(options: AppOptions) {
   await app.register(statsController, { prefix: '/api/stats' });
   await app.register(authController, { prefix: '/api/auth' });
   await app.register(configController, { prefix: '/api/db' });
+  await app.register(nodemgrController, { prefix: '/api/nt' });
 
   if (autoListen) {
     // Start server

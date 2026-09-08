@@ -1,0 +1,1150 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>mihomo 节点热更新工具</title>
+<style>
+  :root {
+    --bg: #0f1117; --card: #1a1d27; --border: #2a2f3d;
+    --text: #e6e9f0; --dim: #8b93a7; --accent: #4f8cff; --accent2: #2dd4bf;
+    --danger: #f87171; --ok: #34d399; --warn: #fbbf24;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+    min-height: 100vh; padding: 24px 16px 60px;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; }
+  header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+  header h1 { font-size: 20px; font-weight: 600; }
+  .badge {
+    font-size: 12px; padding: 3px 10px; border-radius: 20px;
+    border: 1px solid var(--border); color: var(--dim);
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .badge .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); }
+  .badge.ok { color: var(--ok); border-color: rgba(52,211,153,.35); }
+  .badge.ok .dot { background: var(--ok); }
+  .badge.bad { color: var(--danger); border-color: rgba(248,113,113,.35); }
+  .badge.bad .dot { background: var(--danger); }
+  .tabs { display: flex; gap: 8px; margin-bottom: 16px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+  .tab {
+    background: transparent; border: 1px solid var(--border); color: var(--dim);
+    padding: 8px 18px; border-radius: 8px; font-size: 14px; cursor: pointer; font-weight: 500;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 18px; margin-bottom: 16px;
+  }
+  .card h2 { font-size: 15px; margin-bottom: 12px; color: var(--text); font-weight: 600; }
+  textarea {
+    width: 100%; min-height: 96px; resize: vertical;
+    background: var(--bg); color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 12px; font-size: 13px; font-family: ui-monospace, Consolas, monospace;
+    line-height: 1.5; outline: none;
+  }
+  textarea:focus, input:focus { border-color: var(--accent); }
+  input[type="text"] {
+    background: var(--bg); color: var(--text); border: 1px solid var(--border);
+    border-radius: 8px; padding: 9px 12px; font-size: 13px; outline: none; flex: 1; min-width: 160px;
+    font-family: ui-monospace, Consolas, monospace;
+  }
+  .hint { color: var(--dim); font-size: 12px; margin-top: 6px; }
+  .row { display: flex; gap: 10px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .btn {
+    background: var(--accent); color: #fff; border: none;
+    padding: 9px 18px; border-radius: 8px; font-size: 14px;
+    cursor: pointer; font-weight: 500;
+  }
+  .btn:hover { filter: brightness(1.1); }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .btn.ghost { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .btn.danger { background: transparent; border: 1px solid rgba(248,113,113,.4); color: var(--danger); font-size: 12px; padding: 4px 10px; }
+  .btn.small { font-size: 13px; padding: 6px 14px; }
+  .btn.mini { font-size: 12px; padding: 3px 8px; border-radius: 6px; background: transparent; border: 1px solid var(--border); color: var(--dim); cursor: pointer; }
+  .btn.mini:hover { color: var(--text); border-color: var(--accent); }
+  label.chk { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--dim); cursor: pointer; }
+  input[type="checkbox"] { accent-color: var(--accent); width: 15px; height: 15px; }
+  select {
+    background: var(--bg); color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 10px; font-size: 13px; max-width: 340px; outline: none;
+  }
+  .msgs { margin-top: 12px; display: none; }
+  .msgs .msg {
+    font-size: 13px; padding: 8px 12px; border-radius: 8px; margin-bottom: 6px;
+    word-break: break-all; white-space: pre-wrap;
+  }
+  .msg.ok { background: rgba(52,211,153,.1); color: var(--ok); border: 1px solid rgba(52,211,153,.3); }
+  .msg.err { background: rgba(248,113,113,.1); color: var(--danger); border: 1px solid rgba(248,113,113,.3); }
+  .msg.info { background: rgba(79,140,255,.1); color: var(--accent2); border: 1px solid rgba(45,212,191,.25); }
+  .msg.warn { background: rgba(251,191,36,.1); color: var(--warn); border: 1px solid rgba(251,191,36,.3); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: var(--dim); font-weight: 500; padding: 8px 6px; border-bottom: 1px solid var(--border); }
+  td { padding: 8px 6px; border-bottom: 1px solid rgba(42,47,61,.6); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  .mono { font-family: ui-monospace, Consolas, monospace; font-size: 12px; color: var(--dim); }
+  .ruletxt { font-family: ui-monospace, Consolas, monospace; font-size: 12px; word-break: break-all; line-height: 1.5; }
+  .tag {
+    display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 4px;
+    margin-right: 6px; border: 1px solid var(--border); color: var(--dim);
+  }
+  .tag.match { color: var(--warn); border-color: rgba(251,191,36,.4); }
+  .tag.rs { color: var(--accent2); border-color: rgba(45,212,191,.3); }
+  .empty { color: var(--dim); font-size: 13px; text-align: center; padding: 18px 0; }
+  .current { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .current .tag { background: rgba(45,212,191,.12); color: var(--accent2); border: 1px solid rgba(45,212,191,.3); padding: 2px 10px; border-radius: 6px; font-size: 12px; }
+  .spin { display: inline-block; width: 12px; height: 12px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: r .7s linear infinite; vertical-align: -2px; }
+  @keyframes r { to { transform: rotate(360deg); } }
+  .footer { color: var(--dim); font-size: 12px; text-align: center; margin-top: 24px; }
+  .preview {
+    background: var(--bg); border: 1px dashed var(--border); border-radius: 8px;
+    padding: 10px 12px; font-family: ui-monospace, Consolas, monospace; font-size: 12px;
+    color: var(--accent2); margin-top: 10px; word-break: break-all;
+  }
+  .num { color: var(--dim); font-size: 12px; }
+  .ops { display: flex; gap: 4px; flex-wrap: wrap; }
+  .hidden { display: none; }
+  .modal-mask {
+    position: fixed; inset: 0; z-index: 100;
+    background: rgba(0,0,0,.6); display: flex;
+    align-items: center; justify-content: center; padding: 20px;
+  }
+  .modal {
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 20px; width: 100%; max-width: 620px; max-height: 86vh; overflow-y: auto;
+  }
+  .modal h3 { font-size: 15px; margin-bottom: 12px; }
+  .lbl { display: block; font-size: 12px; color: var(--dim); margin-bottom: 5px; }
+  .txt {
+    width: 100%; background: var(--bg); color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 10px; font-size: 13px; outline: none;
+  }
+  .txt:focus { border-color: var(--accent); }
+  .pvViewPre {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    padding: 12px; font-size: 12px; line-height: 1.6; max-height: 50vh; overflow-y: auto;
+    white-space: pre-wrap; word-break: break-all; font-family: ui-monospace, Consolas, monospace;
+  }
+  .tag.local { color: var(--ok); border-color: rgba(52,211,153,.35); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🐱 mihomo 节点热更新</h1>
+    <span class="badge" id="mihomoBadge"><span class="dot"></span>检查中…</span>
+    <span class="badge" id="groupBadge"></span>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" id="tabNodesBtn" onclick="switchTab('nodes')">📡 节点管理</button>
+    <button class="tab" id="tabRulesBtn" onclick="switchTab('rules')">📜 分流规则</button>
+    <button class="tab" id="tabDiagBtn" onclick="switchTab('diag')">🔬 验证中心</button>
+    <button class="tab" id="tabOpsBtn" onclick="switchTab('ops')">🛠 运维中心</button>
+  </div>
+
+  <!-- ================= 节点管理 ================= -->
+  <section id="panelNodes">
+    <div class="card">
+      <h2>粘贴节点链接</h2>
+      <textarea id="input" placeholder="支持格式：
+vmess://  vless://  trojan://  ss://  ssr://  hysteria2://(hy2://)  tuic://  http://  socks5://
+
+示例：vless://uuid@服务器:443?security=tls#我的节点
+可一次粘贴多行，每行一个节点；重复粘贴同名节点 = 覆盖更新"></textarea>
+      <div class="hint">💡 想让节点自动进入 🇭🇰/🇯🇵/🇺🇸/🇸🇬 地区组？节点名带上地区关键词即可（如 HK-xxx / 日本-xxx / SG-xxx / US-xxx）</div>
+      <div class="row">
+        <button class="btn" id="addBtn" onclick="doAdd()">➕ 添加并生效</button>
+        <label class="chk"><input type="checkbox" id="autoSel" checked> 添加后自动在「🚀 默认代理」中选中（全局流量立即走新节点）</label>
+      </div>
+      <div class="msgs" id="addMsgs"></div>
+    </div>
+
+    <div class="card">
+      <h2>当前代理选择</h2>
+      <div class="current">
+        <select id="mainSelect" onchange="doSelect()"></select>
+        <button class="btn small ghost" onclick="loadState()">🔄 刷新</button>
+      </div>
+      <div class="msgs" id="selMsgs"></div>
+    </div>
+
+    <div class="card">
+      <h2>自建节点列表 <span style="color:var(--dim);font-weight:400;font-size:12px" id="nodeCount"></span></h2>
+      <table>
+        <thead><tr><th style="width:26%">名称</th><th style="width:80px">类型</th><th>服务器</th><th style="width:70px">端口</th><th style="width:60px"></th></tr></thead>
+        <tbody id="nodeBody"></tbody>
+      </table>
+      <div class="empty" id="nodeEmpty">暂无自建节点 —— 在上方粘贴你的节点即可</div>
+    </div>
+  </section>
+
+  <!-- ================= 规则管理 ================= -->
+  <section id="panelRules" class="hidden">
+    <div class="card">
+      <h2 id="ruleFormTitle">➕ 添加分流规则</h2>
+      <div class="hint" style="margin-bottom:10px">规则从上到下逐条匹配，<b>命中即停</b>——上面的规则优先。想"某网站走某节点"，加到最前面即可。</div>
+      <div class="grid2">
+        <div>
+          <select id="rType" onchange="typeChanged()"></select>
+        </div>
+        <div>
+          <select id="rTarget"></select>
+        </div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <input type="text" id="rValue" placeholder="匹配值…" oninput="refreshPreview()">
+        <label class="chk hidden" id="noResolveWrap"><input type="checkbox" id="rNoResolve" onchange="refreshPreview()"> no-resolve</label>
+      </div>
+      <div class="preview" id="rPreview"></div>
+      <div class="row">
+        <button class="btn" id="ruleAddBtn" onclick="doRuleSave()">✅ 保存规则并生效</button>
+        <label class="chk" style="font-size:12px">位置：
+          <select id="rPosition" style="padding:4px 6px;font-size:12px">
+            <option value="bottom">🔒 MATCH 兜底之前（默认）</option>
+            <option value="top">⬆️ 置顶（最先匹配）</option>
+          </select>
+        </label>
+        <button class="btn small ghost hidden" id="ruleCancelBtn" onclick="cancelRuleEdit()">取消编辑</button>
+      </div>
+      <div class="msgs" id="ruleMsgs"></div>
+    </div>
+
+    <div class="card">
+      <h2>📦 规则集 (rule-providers) <span style="color:var(--dim);font-weight:400;font-size:12px" id="provCount"></span></h2>
+      <div class="hint" style="margin-bottom:10px">规则行 `RULE-SET,名字,目标` 引用的是这里定义的集合。<b>远程库</b>(mrs)自动更新、只读；<b>本地规则集</b>可在线编辑内容——适合放你自己的域名/IP 清单。</div>
+      <table>
+        <thead><tr><th style="width:22%">名称</th><th style="width:70px">类型</th><th style="width:80px">behavior</th><th>来源</th><th style="width:150px">操作</th></tr></thead>
+        <tbody id="provBody"></tbody>
+      </table>
+      <div class="empty" id="provEmpty">加载中…</div>
+      <div class="row">
+        <button class="btn small" onclick="openProvCreate()">➕ 新建本地规则集</button>
+        <span class="hint" style="margin:0">新建后可到上方「添加分流规则」选 RULE-SET 类型引用它</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>当前分流规则 <span style="color:var(--dim);font-weight:400;font-size:12px" id="ruleCount"></span></h2>
+      <div class="hint" style="margin-bottom:8px">🎯 目标 = 策略组（如 🚀 默认代理 / 🇭🇰 香港节点）或具体节点（如 US-大妈）。DIRECT=直连，REJECT=拦截。</div>
+      <table>
+        <thead><tr><th style="width:36px">#</th><th>规则内容</th><th style="width:150px">操作</th></tr></thead>
+        <tbody id="ruleBody"></tbody>
+      </table>
+      <div class="empty" id="ruleEmpty">加载中…</div>
+    </div>
+  </section>
+
+  <!-- ================= 验证中心 ================= -->
+  <section id="panelDiag" class="hidden">
+    <!-- 出口信息 -->
+    <div class="card">
+      <h2>🌐 当前出口</h2>
+      <div class="current" id="egressBox">
+        <span class="tag" id="egMain"></span>
+        <span class="tag" id="egIp"></span>
+      </div>
+      <div class="msgs" id="egMsgs"></div>
+      <div class="row">
+        <button class="btn small" onclick="doEgress()">🔄 重新检测出口</button>
+        <span class="hint" style="margin:0">代理出口 IP = 你当前节点所在位置；直连出口 = 不走代理时的 IP（TUN 开启时两者可能相同）</span>
+      </div>
+    </div>
+
+    <!-- 延迟测速 -->
+    <div class="card">
+      <h2>⚡ 节点延迟测速 <span style="color:var(--dim);font-weight:400;font-size:12px" id="speedNote"></span></h2>
+      <div class="msgs" id="speedMsgs"></div>
+      <div class="row">
+        <button class="btn" id="speedBtn" onclick="doSpeed()">🚀 测速全部节点/组</button>
+        <span class="hint" style="margin:0">并发测速，约几秒完成；绿色=通畅</span>
+      </div>
+      <table style="margin-top:10px;display:none" id="speedTable">
+        <thead><tr><th style="width:30%">名称</th><th style="width:80px">类型</th><th>延迟</th></tr></thead>
+        <tbody id="speedBody"></tbody>
+      </table>
+    </div>
+
+    <!-- 规则追踪 -->
+    <div class="card">
+      <h2>🛰 规则追踪 <span style="color:var(--dim);font-weight:400;font-size:12px">输入一个域名，看它最终走哪条规则、哪个节点</span></h2>
+      <div class="row">
+        <input type="text" id="traceInput" placeholder="例如: www.youtube.com / chatgpt.com / github.com" style="flex:1;min-width:240px" onkeydown="if(event.key==='Enter')doTrace()">
+        <button class="btn" id="traceBtn" onclick="doTrace()">🔍 追踪</button>
+      </div>
+      <div class="msgs" id="traceMsgs"></div>
+      <div id="traceResult" style="display:none;margin-top:12px;border:1px solid var(--border);border-radius:8px;padding:14px"></div>
+    </div>
+  </section>
+
+  <!-- ================= 运维中心 ================= -->
+  <section id="panelOps" class="hidden">
+    <!-- 活动连接 -->
+    <div class="card">
+      <h2>🔗 活动连接 <span style="color:var(--dim);font-weight:400;font-size:12px" id="connCount"></span></h2>
+      <div class="row">
+        <button class="btn small" onclick="doConns()">🔄 刷新连接</button>
+        <button class="btn small danger" onclick="doCloseAll()">⛔ 断开全部连接</button>
+        <span class="hint" style="margin:0">正在访问的流量会显示在这里，含命中规则与策略链；可单独断开某条</span>
+      </div>
+      <div class="msgs" id="connMsgs"></div>
+      <div style="overflow-x:auto">
+        <table style="margin-top:8px">
+          <thead><tr><th>目标</th><th style="width:80px">来源IP</th><th style="width:90px">进程</th><th style="width:110px">命中规则</th><th style="width:110px">策略链</th><th style="width:90px">流量↓</th><th style="width:64px"></th></tr></thead>
+          <tbody id="connBody"></tbody>
+        </table>
+        <div class="empty" id="connEmpty">暂无活动连接</div>
+      </div>
+    </div>
+
+    <!-- 配置备份/回滚 -->
+    <div class="card">
+      <h2>🕐 配置备份 / 回滚 <span style="color:var(--dim);font-weight:400;font-size:12px" id="bkCount"></span></h2>
+      <div class="hint" style="margin-bottom:8px">每次改动自动备份（保留30份）。选一份备份点「回滚」即恢复到那个时刻的配置（回滚前会自动再备份当前状态，安全）。</div>
+      <div class="msgs" id="bkMsgs"></div>
+      <table id="bkTable" style="display:none">
+        <thead><tr><th>备份文件</th><th style="width:110px">时间</th><th style="width:90px">大小</th><th style="width:80px"></th></tr></thead>
+        <tbody id="bkBody"></tbody>
+      </table>
+      <div class="empty" id="bkEmpty">加载中…</div>
+    </div>
+
+    <!-- 完整配置编辑 -->
+    <div class="card">
+      <h2>📝 完整配置编辑 <span style="color:var(--dim);font-weight:400;font-size:12px">高级功能：直接编辑整个 config.yaml（secret 已自动打码，保存时自动还原并校验）</span></h2>
+      <div class="row" style="margin-top:4px">
+        <button class="btn small ghost" onclick="loadCfg()">📂 载入当前配置</button>
+        <button class="btn small" id="cfgSaveBtn" onclick="saveCfg()" disabled>💾 保存并热加载</button>
+        <span class="hint" style="margin:0">⚠️ 保存前会备份 + mihomo -t 校验，失败自动回滚</span>
+      </div>
+      <div class="msgs" id="cfgMsgs"></div>
+      <textarea id="cfgArea" style="min-height:280px;margin-top:10px;display:none" placeholder="点击「载入当前配置」后在这里编辑…" spellcheck="false"></textarea>
+    </div>
+  </section>
+
+  <div class="footer">mihomo-node-tool · 修改前自动备份配置到 backups/ · 规则改动自动校验(mihomo -t)，失败即回滚 · 需要帮助随时找我</div>
+</div>
+
+<!-- 规则集 新建/编辑 弹窗 -->
+<div class="modal-mask" id="provModal" style="display:none" onclick="if(event.target===this)closeProvModal()">
+  <div class="modal">
+    <h3 id="provModalTitle">➕ 新建本地规则集</h3>
+    <div class="grid2">
+      <div>
+        <label class="lbl">名称（字母/数字/下划线，如 my_list）</label>
+        <input type="text" id="pvName" class="txt" placeholder="my_sites">
+      </div>
+      <div>
+        <label class="lbl">内容类型 behavior</label>
+        <select id="pvBehavior" onchange="pvHelp()">
+          <option value="domain">domain — 每行一个域名</option>
+          <option value="ipcidr">ipcidr — 每行一个 IP 网段</option>
+          <option value="classical">classical — 每行一条完整规则(不带策略组)</option>
+        </select>
+      </div>
+    </div>
+    <div class="hint" id="pvHelpText" style="margin:8px 0"></div>
+    <textarea id="pvLines" style="min-height:180px" placeholder="每行一条，支持 # 注释&#10;例如:&#10;example.com&#10;google.com"></textarea>
+    <div class="row" style="justify-content:flex-end">
+      <button class="btn small ghost" onclick="closeProvModal()">取消</button>
+      <button class="btn small" id="pvSaveBtn" onclick="saveProv()">💾 保存并生效</button>
+    </div>
+    <div class="msgs" id="pvMsgs"></div>
+  </div>
+</div>
+
+<!-- 规则集 查看弹窗 -->
+<div class="modal-mask" id="pvViewModal" style="display:none" onclick="if(event.target===this)this.style.display='none'">
+  <div class="modal">
+    <h3 id="pvViewTitle">规则集内容</h3>
+    <pre class="pvViewPre" id="pvViewBody"></pre>
+    <div class="row" style="justify-content:flex-end">
+      <button class="btn small ghost" onclick="$('pvViewModal').style.display='none'">关闭</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let state = null;
+let rulesMeta = null;   // {targets, groups, types}
+let editingIdx = -1;    // -1 = 新增模式, >=0 = 编辑第几条
+
+const TYPE_HINTS = {
+  'DOMAIN': '精确域名，如 example.com',
+  'DOMAIN-SUFFIX': '域名后缀，如 google.com（含所有子域名）',
+  'DOMAIN-KEYWORD': '域名含关键词，如 google',
+  'DOMAIN-REGEX': '域名正则，如 ^\\.?google.+$',
+  'GEOIP': 'IP 归属地，如 CN / US / HK / JP / SG（国内直连常用 CN）',
+  'GEOSITE': '网站分类库，如 netflix / youtube / telegram（需 geosite 支持）',
+  'IP-CIDR': 'IP 网段，如 1.2.3.0/24 或 1.2.3.4/32',
+  'IP-CIDR6': 'IPv6 网段',
+  'PROCESS-NAME': '进程名，如 clash.exe / WeChat.exe',
+  'RULE-SET': '引用规则集名称，如 cn / netflix_domain / ads（见 rule-providers）',
+};
+
+async function api(method, path, body) {
+  const opt = { method, headers: {} };
+  if (body !== undefined) { opt.headers['Content-Type'] = 'application/json'; opt.body = JSON.stringify(body); }
+  const r = await fetch(path, opt);
+  let j = {};
+  try { j = await r.json(); } catch (e) {}
+  if (!r.ok && !j.added) throw new Error(j.error || ('HTTP ' + r.status));
+  return j;
+}
+
+function showMsgs(el, items) {
+  if (!items || !items.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  el.style.display = 'block';
+  el.innerHTML = items.map(m =>
+    `<div class="msg ${m.type}">${escapeHtml(m.text)}</div>`).join('');
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+/* ---------- Tab ---------- */
+function switchTab(name) {
+  $('tabNodesBtn').classList.toggle('active', name === 'nodes');
+  $('tabRulesBtn').classList.toggle('active', name === 'rules');
+  $('tabDiagBtn').classList.toggle('active', name === 'diag');
+  $('tabOpsBtn').classList.toggle('active', name === 'ops');
+  $('panelNodes').classList.toggle('hidden', name !== 'nodes');
+  $('panelRules').classList.toggle('hidden', name !== 'rules');
+  $('panelDiag').classList.toggle('hidden', name !== 'diag');
+  $('panelOps').classList.toggle('hidden', name !== 'ops');
+  if (name === 'rules') loadRules();
+  if (name === 'diag') { doEgress(); }
+  if (name === 'ops') { doConns(); doBkps(); }
+}
+
+/* ---------- 节点管理 ---------- */
+async function loadState() {
+  try {
+    state = await api('GET', '/api/state');
+    const m = state.mihomo;
+    const badge = $('mihomoBadge');
+    badge.className = 'badge ' + (m.connected ? 'ok' : 'bad');
+    badge.innerHTML = `<span class="dot"></span>mihomo ${m.connected ? '已连接 v' + escapeHtml(m.version) : '未连接'}`;
+    $('groupBadge').textContent = '主组: ' + state.main_group;
+    renderSelect(state.main_now, state.main_options);
+    renderNodes(state.nodes);
+  } catch (e) {
+    $('mihomoBadge').className = 'badge bad';
+    $('mihomoBadge').innerHTML = '<span class="dot"></span>服务错误';
+    showMsgs($('addMsgs'), [{type:'err', text: String(e)}]);
+  }
+}
+
+function renderSelect(now, options) {
+  const sel = $('mainSelect');
+  sel.innerHTML = '';
+  (options || []).forEach(o => {
+    const op = document.createElement('option');
+    op.value = o; op.textContent = o;
+    if (o === now) op.selected = true;
+    sel.appendChild(op);
+  });
+}
+
+function renderNodes(nodes) {
+  const list = nodes || [];
+  $('nodeCount').textContent = `(${list.length})`;
+  const tb = $('nodeBody');
+  tb.innerHTML = '';
+  $('nodeEmpty').style.display = list.length ? 'none' : 'block';
+  list.forEach(n => {
+    const tr = document.createElement('tr');
+    const nameTd = document.createElement('td');
+    nameTd.textContent = n.name;
+    const tTd = document.createElement('td');
+    tTd.textContent = n.type;
+    const sTd = document.createElement('td');
+    sTd.className = 'mono'; sTd.textContent = n.server || '-';
+    const pTd = document.createElement('td');
+    pTd.className = 'mono'; pTd.textContent = n.port || '-';
+    const aTd = document.createElement('td');
+    const del = document.createElement('button');
+    del.className = 'btn danger'; del.textContent = '删除';
+    del.onclick = () => doDelete(n.name);
+    aTd.appendChild(del);
+    tr.append(nameTd, tTd, sTd, pTd, aTd);
+    tb.appendChild(tr);
+  });
+}
+
+async function doAdd() {
+  const text = $('input').value.trim();
+  if (!text) { showMsgs($('addMsgs'), [{type:'err', text:'请先粘贴节点链接'}]); return; }
+  const btn = $('addBtn');
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span> 解析并热加载中…';
+  showMsgs($('addMsgs'), []);
+  try {
+    const r = await api('POST', '/api/nodes', { text, auto_select: $('autoSel').checked });
+    const msgs = [];
+    (r.added || []).forEach(a => msgs.push({ type: 'ok', text: `✅ 已添加 [${a.name}] (${a.type} ${a.server}:${a.port})` }));
+    const meta = r.meta || {};
+    if (r.added && r.added.length) {
+      msgs.push({ type: 'info', text: `热加载完成(${meta.reload || ''}) | 配置已备份: ${meta.backup || ''}` });
+      if (meta.select) msgs.push({ type: 'info', text: meta.select });
+    }
+    (r.errors || []).forEach(e => msgs.push({ type: 'err', text: '⚠️ ' + e }));
+    if (!r.added.length && !r.errors.length) msgs.push({ type: 'err', text: '没有识别到可解析的节点链接' });
+    showMsgs($('addMsgs'), msgs);
+    $('input').value = '';
+    await loadState();
+  } catch (e) {
+    showMsgs($('addMsgs'), [{type:'err', text: String(e)}]);
+  } finally {
+    btn.disabled = false; btn.textContent = '➕ 添加并生效';
+  }
+}
+
+async function doSelect() {
+  const name = $('mainSelect').value;
+  if (!name) return;
+  showMsgs($('selMsgs'), []);
+  try {
+    const r = await api('POST', '/api/select', { name });
+    showMsgs($('selMsgs'), [{ type: 'ok', text: `✅ 已切换到: ${r.now}` }]);
+    await loadState();
+  } catch (e) {
+    showMsgs($('selMsgs'), [{type:'err', text: String(e)}]);
+  }
+}
+
+async function doDelete(name) {
+  if (!confirm(`确定删除节点「${name}」？\n删除后如它正在被使用，会自动切回其他节点`)) return;
+  showMsgs($('selMsgs'), []);
+  try {
+    const r = await api('DELETE', '/api/nodes/' + encodeURIComponent(name));
+    showMsgs($('selMsgs'), [{ type: 'ok', text: `🗑 已删除 [${name}] | ${r.reload || ''}` }]);
+    await loadState();
+  } catch (e) {
+    showMsgs($('selMsgs'), [{type:'err', text: String(e)}]);
+  }
+}
+
+/* ---------- 规则管理 ---------- */
+async function loadRules() {
+  try {
+    const d = await api('GET', '/api/rules');
+    rulesMeta = d;
+    renderTypeSelect(d.types || []);
+    renderTargetSelect(d.targets || [], d.groups || []);
+    renderRules(d.rules || []);
+  } catch (e) {
+    showMsgs($('ruleMsgs'), [{type:'err', text: '加载规则失败: ' + e}]);
+  }
+  loadProviders();
+}
+
+function renderTypeSelect(types) {
+  const sel = $('rType');
+  const cur = sel.value || 'DOMAIN-SUFFIX';
+  sel.innerHTML = '';
+  const labels = {
+    'DOMAIN': '🌐 域名（精确）', 'DOMAIN-SUFFIX': '🔗 域名后缀',
+    'DOMAIN-KEYWORD': '🔍 域名关键词', 'DOMAIN-REGEX': '🧩 域名正则',
+    'GEOIP': '🌏 IP 归属地', 'GEOSITE': '🗂 网站分类(GEOSITE)',
+    'IP-CIDR': '📡 IP 网段', 'IP-CIDR6': '📡 IPv6 网段',
+    'PROCESS-NAME': '⚙️ 进程名', 'RULE-SET': '📦 规则集引用',
+  };
+  types.forEach(t => {
+    const op = document.createElement('option');
+    op.value = t; op.textContent = labels[t] || t;
+    sel.appendChild(op);
+  });
+  sel.value = types.includes(cur) ? cur : 'DOMAIN-SUFFIX';
+  typeChanged();
+}
+
+function renderTargetSelect(targets, groups) {
+  const sel = $('rTarget');
+  const cur = sel.value;
+  sel.innerHTML = '';
+  const byName = {};
+  const gSet = new Set(groups || []);
+  // 分组: 策略组 / 具体节点 / 内置
+  const grp = [], node = [], builtin = [];
+  (targets || []).forEach(t => {
+    if (t === 'DIRECT' || t === 'REJECT') builtin.push(t);
+    else if (gSet.has(t)) grp.push(t);
+    else node.push(t);
+  });
+  const mk = (label, arr) => {
+    if (!arr.length) return;
+    const og = document.createElement('optgroup');
+    og.label = label;
+    arr.forEach(v => {
+      const op = document.createElement('option');
+      op.value = v; op.textContent = v;
+      if (v === cur) op.selected = true;
+      og.appendChild(op);
+    });
+    sel.appendChild(og);
+  };
+  mk('策略组', grp);
+  mk('节点', node);
+  mk('内置', builtin);
+  if (!cur && grp.length) {
+    // 默认选中 🚀 默认代理 若存在
+    const def = grp.find(g => g.includes('默认代理')) || grp[0];
+    sel.value = def;
+  }
+  refreshPreview();
+}
+
+function typeChanged() {
+  const t = $('rType').value;
+  $('rValue').placeholder = TYPE_HINTS[t] || '匹配值';
+  const showNR = ['IP-CIDR', 'IP-CIDR6', 'GEOIP'].includes(t);
+  $('noResolveWrap').classList.toggle('hidden', !showNR);
+  refreshPreview();
+}
+
+function currentRuleText() {
+  const type = $('rType').value;
+  const value = $('rValue').value.trim();
+  const target = $('rTarget').value;
+  if (!value) return null;
+  let line = `${type},${value}`;
+  if (type !== 'RULE-SET') line += `,${target}`;
+  else line += `,${target}`;
+  if ($('rNoResolve').checked && !line.includes('no-resolve')) line += ',no-resolve';
+  return line;
+}
+
+function refreshPreview() {
+  const line = currentRuleText();
+  $('rPreview').textContent = line ? '📋 ' + line : '📋 填写匹配值后这里预览规则…';
+  $('rPreview').style.color = line ? 'var(--accent2)' : 'var(--dim)';
+}
+
+function renderRules(rules) {
+  $('ruleCount').textContent = `(${rules.length})`;
+  const tb = $('ruleBody');
+  tb.innerHTML = '';
+  $('ruleEmpty').style.display = rules.length ? 'none' : 'block';
+  $('ruleEmpty').textContent = rules.length ? '' : '暂无规则（只有 MATCH 兜底）';
+  rules.forEach(r => {
+    const tr = document.createElement('tr');
+    const nTd = document.createElement('td');
+    nTd.className = 'num'; nTd.textContent = r.index + 1;
+    const tTd = document.createElement('td');
+    const tags = [];
+    if (r.match) tags.push('<span class="tag match">🔒 兜底</span>');
+    if (r.rule_set) tags.push('<span class="tag rs">📦 规则集</span>');
+    tTd.innerHTML = tags.join('') + `<span class="ruletxt">${escapeHtml(r.text)}</span>`;
+    const oTd = document.createElement('td');
+    oTd.className = 'ops';
+    if (!r.match) {
+      const up = mkMini('↑', `上移(优先级更高)`, () => doRuleMove(r.index, 'up'));
+      const dn = mkMini('↓', `下移(优先级更低)`, () => doRuleMove(r.index, 'down'));
+      const ed = mkMini('✏️', '编辑', () => startRuleEdit(r));
+      const del = mkMini('🗑', '删除', () => doRuleDelete(r));
+      oTd.append(up, dn, ed, del);
+    } else {
+      const tip = document.createElement('span');
+      tip.className = 'mono'; tip.textContent = '—';
+      oTd.appendChild(tip);
+    }
+    tr.append(nTd, tTd, oTd);
+    tb.appendChild(tr);
+  });
+}
+
+function mkMini(label, tip, fn) {
+  const b = document.createElement('button');
+  b.className = 'btn mini'; b.textContent = label; b.title = tip;
+  b.onclick = fn;
+  return b;
+}
+
+async function doRuleSave() {
+  const text = currentRuleText();
+  if (!text) { showMsgs($('ruleMsgs'), [{type:'err', text:'请填写匹配值'}]); return; }
+  const btn = $('ruleAddBtn');
+  btn.disabled = true;
+  const label = btn.textContent;
+  btn.innerHTML = '<span class="spin"></span> 校验并热加载中…';
+  showMsgs($('ruleMsgs'), []);
+  try {
+    let r;
+    if (editingIdx >= 0) {
+      r = await api('PUT', `/api/rules/${editingIdx}`, { text });
+    } else {
+      r = await api('POST', '/api/rules', { text, position: $('rPosition').value });
+    }
+    const msgs = [{ type: 'ok', text: `✅ ${r.message || '规则已生效'}` }];
+    if (r.backup) msgs.push({ type: 'info', text: `配置已备份: ${r.backup} | 热加载: ${r.reload || ''}` });
+    showMsgs($('ruleMsgs'), msgs);
+    cancelRuleEdit(true);
+    await loadRules();
+  } catch (e) {
+    showMsgs($('ruleMsgs'), [{type:'err', text: String(e)}]);
+  } finally {
+    btn.disabled = false; btn.textContent = label;
+  }
+}
+
+function startRuleEdit(r) {
+  editingIdx = r.index;
+  const parts = r.text.split(',');
+  const type = parts[0].trim();
+  const last = parts[parts.length - 1].trim();
+  const noResolve = last === 'no-resolve';
+  const targetIdx = noResolve ? parts.length - 2 : parts.length - 1;
+  const value = parts.slice(1, noResolve ? parts.length - 2 : parts.length - 1).join(',').trim();
+  // 重新填类型
+  const types = rulesMeta?.types || [];
+  if (types.includes(type)) { $('rType').value = type; typeChanged(); }
+  $('rValue').value = value;
+  if (noResolve) $('rNoResolve').checked = true;
+  if (targetIdx >= 1) {
+    const tSel = $('rTarget');
+    const tgt = parts[targetIdx].trim();
+    if ([...tSel.options].some(o => o.value === tgt)) tSel.value = tgt;
+  }
+  $('ruleFormTitle').textContent = `✏️ 编辑第 ${r.index + 1} 条规则`;
+  $('ruleAddBtn').textContent = '💾 保存修改';
+  $('ruleCancelBtn').classList.remove('hidden');
+  refreshPreview();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function cancelRuleEdit(silent) {
+  editingIdx = -1;
+  $('ruleFormTitle').textContent = '➕ 添加分流规则';
+  $('ruleAddBtn').textContent = '✅ 保存规则并生效';
+  $('ruleCancelBtn').classList.add('hidden');
+  $('rValue').value = '';
+  $('rNoResolve').checked = false;
+  if (!silent) refreshPreview();
+}
+
+async function doRuleMove(idx, dir) {
+  showMsgs($('ruleMsgs'), []);
+  try {
+    const r = await api('POST', `/api/rules/${idx}/move`, { direction: dir });
+    showMsgs($('ruleMsgs'), [{ type: 'ok', text: `✅ ${r.message || '已移动'}` }]);
+    await loadRules();
+  } catch (e) {
+    showMsgs($('ruleMsgs'), [{type:'err', text: String(e)}]);
+  }
+}
+
+async function doRuleDelete(r) {
+  const tip = r.rule_set ? '\n⚠️ 这是规则集引用，删除后该分类流量将落到后续规则' : '';
+  if (!confirm(`确定删除规则 #${r.index + 1}？\n${r.text}${tip}`)) return;
+  showMsgs($('ruleMsgs'), []);
+  try {
+    const res = await api('DELETE', `/api/rules/${r.index}`);
+    showMsgs($('ruleMsgs'), [{ type: 'ok', text: `🗑 ${res.message || '已删除'} | 热加载: ${res.reload || ''}` }]);
+    await loadRules();
+  } catch (e) {
+    showMsgs($('ruleMsgs'), [{type:'err', text: String(e)}]);
+  }
+}
+
+/* ---------- 验证中心 ---------- */
+async function doEgress() {
+  showMsgs($('egMsgs'), [{ type: 'info', text: '检测中…' }]);
+  try {
+    const d = await api('GET', '/api/diag/egress');
+    const html = [];
+    if (d.main_group) html.push(`<b>${escapeHtml(d.main_group)}</b> → ${escapeHtml(d.main_now || '?')}`);
+    if (d.proxy_ip) {
+      html.push(`🌏 代理出口: <b>${escapeHtml(d.proxy_ip)}</b> ${escapeHtml(d.proxy_region || '')} ${escapeHtml(d.proxy_org || '')}`);
+    }
+    if (d.direct_ip) html.push(`🏠 直连出口: ${escapeHtml(d.direct_ip)}`);
+    $('egMain').textContent = '主组: ' + (d.main_group || '?') + ' → ' + (d.main_now || '?');
+    $('egIp').textContent = '代理出口: ' + (d.proxy_ip || '检测失败') + (d.proxy_region ? ' ' + d.proxy_region : '') + (d.proxy_org ? ' (' + d.proxy_org + ')' : '');
+    showMsgs($('egMsgs'), []);
+    if (d.egress_error) showMsgs($('egMsgs'), [{ type: 'warn', text: '提示: ' + d.egress_error }]);
+  } catch (e) {
+    showMsgs($('egMsgs'), [{ type: 'err', text: String(e) }]);
+  }
+}
+
+async function doSpeed() {
+  const btn = $('speedBtn');
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span> 测速中(约10-20s)…';
+  showMsgs($('speedMsgs'), []);
+  $('speedTable').style.display = 'none';
+  try {
+    const d = await api('GET', '/api/diag/speed');
+    const list = d.results || [];
+    $('speedNote').textContent = `(${list.length} 项 · ${d.url || ''})`;
+    const tb = $('speedBody');
+    tb.innerHTML = '';
+    const ok = list.filter(r => r.delay_ms !== undefined);
+    const bad = list.filter(r => r.delay_ms === undefined);
+    const rows = ok.concat(bad);
+    rows.forEach(r => {
+      const tr = document.createElement('tr');
+      const n = document.createElement('td'); n.textContent = r.name;
+      const ty = document.createElement('td'); ty.className = 'mono'; ty.textContent = r.type;
+      const dl = document.createElement('td');
+      if (r.delay_ms !== undefined) {
+        dl.innerHTML = `<span style="color:${r.delay_ms < 300 ? 'var(--ok)' : r.delay_ms < 800 ? 'var(--warn)' : 'var(--danger)'}">⚡ ${r.delay_ms} ms</span>`;
+      } else {
+        dl.innerHTML = `<span style="color:var(--danger)">✖ ${escapeHtml(String(r.error || '超时/失败'))}</span>`;
+      }
+      tr.append(n, ty, dl);
+      tb.appendChild(tr);
+    });
+    $('speedTable').style.display = '';
+    if (!rows.length) showMsgs($('speedMsgs'), [{ type: 'err', text: '没有可测速的节点/组' }]);
+  } catch (e) {
+    showMsgs($('speedMsgs'), [{ type: 'err', text: String(e) }]);
+  } finally {
+    btn.disabled = false; btn.textContent = '🚀 测速全部节点/组';
+  }
+}
+
+async function doTrace() {
+  const domain = $('traceInput').value.trim();
+  if (!domain) { showMsgs($('traceMsgs'), [{ type: 'err', text: '请输入域名' }]); return; }
+  const btn = $('traceBtn');
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span> 追踪中(最多12s)…';
+  showMsgs($('traceMsgs'), []);
+  const box = $('traceResult');
+  box.style.display = 'none';
+  try {
+    const d = await api('POST', '/api/diag/trace', { domain });
+    if (d.error) {
+      showMsgs($('traceMsgs'), [{ type: 'warn', text: '⚠️ ' + d.error + (d.hint ? '\n' + d.hint : '') }]);
+      return;
+    }
+    const chain = (d.chains || []).slice().reverse().map(escapeHtml).join(' → ');
+    box.innerHTML = `
+      <div style="font-size:13px;margin-bottom:8px">🛰 <b>${escapeHtml(d.domain)}</b></div>
+      <div class="ruletxt">命中规则: <b>${escapeHtml(d.rule || '(无)')}</b>${d.rule_payload ? ' (<span class="mono">' + escapeHtml(d.rule_payload) + '</span>)' : ''}</div>
+      <div class="ruletxt" style="margin-top:4px">策略链: <span style="color:var(--accent2)">${chain || '(直连)'}</span></div>
+      <div class="hint" style="margin-top:6px">${escapeHtml(d.process || '') ? '进程: ' + escapeHtml(d.process) + ' · ' : ''}${escapeHtml(d.type || '')}${d.network ? '/' + escapeHtml(d.network) : ''}</div>`;
+    box.style.display = '';
+  } catch (e) {
+    showMsgs($('traceMsgs'), [{ type: 'err', text: String(e) }]);
+  } finally {
+    btn.disabled = false; btn.textContent = '🔍 追踪';
+  }
+}
+
+/* ---------- 运维中心 ---------- */
+let connAuto = null;
+
+async function doConns() {
+  try {
+    const d = await api('GET', '/api/diag/connections?limit=80');
+    $('connCount').textContent = `(${d.total})`;
+    const list = d.connections || [];
+    const tb = $('connBody');
+    tb.innerHTML = '';
+    $('connEmpty').style.display = list.length ? 'none' : 'block';
+    $('connEmpty').textContent = d.error ? String(d.error) : '暂无活动连接';
+    list.forEach(c => {
+      const tr = document.createElement('tr');
+      const host = document.createElement('td');
+      host.className = 'mono';
+      host.textContent = (c.host || c.dest_ip || '?').slice(0, 60);
+      const src = document.createElement('td');
+      src.className = 'mono'; src.textContent = (c.source_ip || '') + (c.source_port ? ':' + c.source_port : '');
+      const proc = document.createElement('td');
+      proc.textContent = c.process || '-';
+      const rule = document.createElement('td');
+      rule.className = 'mono'; rule.textContent = (c.rule || '-') + (c.rule_payload ? '(' + c.rule_payload.slice(0, 18) + ')' : '');
+      const chain = document.createElement('td');
+      chain.className = 'mono';
+      chain.textContent = (c.chains || []).slice().reverse().join(' > ').slice(0, 40) || '直连';
+      const dl = document.createElement('td');
+      dl.className = 'mono'; dl.textContent = fmtBytes(c.download || 0);
+      const act = document.createElement('td');
+      const btn = document.createElement('button');
+      btn.className = 'btn danger'; btn.textContent = '断开';
+      btn.onclick = () => closeConn(c.id);
+      act.appendChild(btn);
+      tr.append(host, src, proc, rule, chain, dl, act);
+      tb.appendChild(tr);
+    });
+  } catch (e) {
+    $('connEmpty').textContent = String(e);
+    $('connEmpty').style.display = '';
+  }
+}
+
+function fmtBytes(b) {
+  if (b < 1024) return b + 'B';
+  if (b < 1048576) return (b / 1024).toFixed(1) + 'KB';
+  return (b / 1048576).toFixed(1) + 'MB';
+}
+
+async function closeConn(id) {
+  showMsgs($('connMsgs'), []);
+  try {
+    const r = await api('DELETE', '/api/diag/connections/' + encodeURIComponent(id));
+    showMsgs($('connMsgs'), [{ type: 'ok', text: r.ok ? '✅ 已断开该连接' : (r.error || '失败') }]);
+    await doConns();
+  } catch (e) {
+    showMsgs($('connMsgs'), [{ type: 'err', text: String(e) }]);
+  }
+}
+
+async function doCloseAll() {
+  if (!confirm('确定断开全部活动连接？')) return;
+  showMsgs($('connMsgs'), []);
+  try {
+    const r = await api('POST', '/api/diag/connections/close-all', {});
+    showMsgs($('connMsgs'), [{ type: 'ok', text: r.ok ? '✅ ' + (r.message || '已全部断开') : (r.error || '失败') }]);
+    await doConns();
+  } catch (e) {
+    showMsgs($('connMsgs'), [{ type: 'err', text: String(e) }]);
+  }
+}
+
+async function doBkps() {
+  try {
+    const d = await api('GET', '/api/diag/backups');
+    $('bkCount').textContent = `(${d.backups.length})`;
+    const tb = $('bkBody');
+    tb.innerHTML = '';
+    $('bkTable').style.display = d.backups.length ? '' : 'none';
+    $('bkEmpty').style.display = d.backups.length ? 'none' : 'block';
+    $('bkEmpty').textContent = d.backups.length ? '' : '暂无备份';
+    d.backups.forEach(b => {
+      const tr = document.createElement('tr');
+      const fn = document.createElement('td');
+      fn.className = 'mono'; fn.textContent = b.file;
+      const tm = document.createElement('td');
+      tm.className = 'mono'; tm.textContent = b.mtime;
+      const sz = document.createElement('td');
+      sz.className = 'mono'; sz.textContent = (b.size / 1024).toFixed(1) + ' KB';
+      const ac = document.createElement('td');
+      const btn = document.createElement('button');
+      btn.className = 'btn danger'; btn.textContent = '回滚';
+      btn.onclick = () => restoreBk(b.file);
+      ac.appendChild(btn);
+      tr.append(fn, tm, sz, ac);
+      tb.appendChild(tr);
+    });
+  } catch (e) {
+    $('bkEmpty').textContent = '加载失败: ' + e;
+    $('bkEmpty').style.display = '';
+  }
+}
+
+async function restoreBk(file) {
+  if (!confirm('确定回滚到 ' + file + '？\n⚠️ 回滚前会自动备份当前配置；校验失败自动恢复')) return;
+  showMsgs($('bkMsgs'), []);
+  try {
+    const r = await api('POST', '/api/diag/backups/restore', { file });
+    showMsgs($('bkMsgs'), [{ type: 'ok', text: '✅ ' + (r.message || '已回滚') + (r.safety_backup ? ' | 当前状态已备份为 ' + r.safety_backup : '') }]);
+    await doBkps();
+  } catch (e) {
+    showMsgs($('bkMsgs'), [{ type: 'err', text: String(e) }]);
+  }
+}
+
+async function loadCfg() {
+  showMsgs($('cfgMsgs'), []);
+  try {
+    const d = await api('GET', '/api/diag/config');
+    $('cfgArea').value = d.content;
+    $('cfgArea').style.display = '';
+    $('cfgSaveBtn').disabled = false;
+    showMsgs($('cfgMsgs'), [{ type: 'info', text: '已载入配置' + (d.secret_masked ? '（secret 已打码，保存时自动还原）' : '') + ' — 编辑完点保存' }]);
+  } catch (e) {
+    showMsgs($('cfgMsgs'), [{ type: 'err', text: String(e) }]);
+  }
+}
+
+async function saveCfg() {
+  const content = $('cfgArea').value;
+  if (!content.trim()) { showMsgs($('cfgMsgs'), [{ type: 'err', text: '配置为空' }]); return; }
+  const btn = $('cfgSaveBtn');
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span> 校验并热加载中…';
+  showMsgs($('cfgMsgs'), []);
+  try {
+    const r = await api('POST', '/api/diag/config', { content });
+    showMsgs($('cfgMsgs'), [{ type: 'ok', text: '✅ ' + (r.message || '已保存') + (r.backup ? ' | 备份: ' + r.backup : '') }]);
+  } catch (e) {
+    showMsgs($('cfgMsgs'), [{ type: 'err', text: String(e) }]);
+  } finally {
+    btn.disabled = false; btn.textContent = '💾 保存并热加载';
+  }
+}
+
+/* ---------- 规则集 (rule-providers) ---------- */
+async function loadProviders() {
+  try {
+    const d = await api('GET', '/api/providers');
+    renderProviders(d.providers || []);
+  } catch (e) {
+    showMsgs($('ruleMsgs'), [{ type: 'err', text: '加载规则集失败: ' + e }]);
+  }
+}
+
+function renderProviders(list) {
+  $('provCount').textContent = `(${list.length})`;
+  const tb = $('provBody');
+  tb.innerHTML = '';
+  $('provEmpty').style.display = list.length ? 'none' : 'block';
+  $('provEmpty').textContent = list.length ? '' : '暂无规则集';
+  list.forEach(p => {
+    const tr = document.createElement('tr');
+    const nTd = document.createElement('td');
+    const tag = document.createElement('span');
+    tag.className = 'tag ' + (p.editable ? 'local' : '');
+    tag.textContent = p.editable ? '本地' : '远程';
+    const nm = document.createElement('span');
+    nm.textContent = p.name;
+    nm.style.fontWeight = '500';
+    nTd.append(tag, nm);
+    const tyTd = document.createElement('td');
+    tyTd.className = 'mono'; tyTd.textContent = p.type;
+    const bhTd = document.createElement('td');
+    bhTd.className = 'mono'; bhTd.textContent = p.behavior || (p.format || '');
+    const sTd = document.createElement('td');
+    sTd.className = 'mono';
+    sTd.textContent = p.editable ? (p.path || '') : (p.url || '').replace(/^https?:\/\//, '').slice(0, 52);
+    sTd.title = p.url || p.path || '';
+    const aTd = document.createElement('td');
+    const ops = document.createElement('div');
+    ops.className = 'ops';
+    const view = document.createElement('button');
+    view.className = 'btn mini'; view.textContent = '查看';
+    view.onclick = () => viewProvider(p);
+    ops.appendChild(view);
+    if (p.editable) {
+      const ed = document.createElement('button');
+      ed.className = 'btn mini'; ed.textContent = '编辑';
+      ed.onclick = () => editProvider(p);
+      const del = document.createElement('button');
+      del.className = 'btn mini'; del.textContent = '删除';
+      del.style.color = 'var(--danger)';
+      del.onclick = () => delProvider(p);
+      ops.append(ed, del);
+    }
+    aTd.appendChild(ops);
+    tr.append(nTd, tyTd, bhTd, sTd, aTd);
+    tb.appendChild(tr);
+  });
+}
+
+async function viewProvider(p) {
+  $('pvViewTitle').textContent = `📖 ${p.name}`;
+  const body = $('pvViewBody');
+  if (!p.editable) {
+    body.textContent = '远程规则库 (mrs / 自动更新) — 内容由 MetaCubeX meta-rules-dat 维护，不可在线查看/编辑。\n\nURL: ' + (p.url || '') + '\n更新间隔: ' + (p.interval || '—') + 's';
+    $('pvViewModal').style.display = 'flex';
+    return;
+  }
+  try {
+    const d = await api('GET', '/api/providers/' + encodeURIComponent(p.name));
+    body.textContent = '# behavior: ' + d.behavior + '\n# 路径: ' + d.path + '\n\n' + (d.lines || []).join('\n');
+  } catch (e) {
+    body.textContent = '读取失败: ' + e;
+  }
+  $('pvViewModal').style.display = 'flex';
+}
+
+function openProvCreate() {
+  $('provModalTitle').textContent = '➕ 新建本地规则集';
+  $('pvName').value = '';
+  $('pvName').disabled = false;
+  $('pvLines').value = '';
+  $('pvMsgs').style.display = 'none';
+  $('pvBehavior').value = 'domain';
+  pvHelp();
+  $('provModal').style.display = 'flex';
+  $('pvName').focus();
+}
+
+async function editProvider(p) {
+  try {
+    const d = await api('GET', '/api/providers/' + encodeURIComponent(p.name));
+    $('provModalTitle').textContent = `✏️ 编辑规则集 ${p.name}`;
+    $('pvName').value = d.name;
+    $('pvName').disabled = true;
+    $('pvBehavior').value = d.behavior || 'domain';
+    $('pvLines').value = (d.lines || []).join('\n');
+    $('pvMsgs').style.display = 'none';
+    pvHelp();
+    $('provModal').style.display = 'flex';
+  } catch (e) {
+    showMsgs($('ruleMsgs'), [{ type: 'err', text: String(e) }]);
+  }
+}
+
+function closeProvModal() {
+  $('provModal').style.display = 'none';
+  $('pvMsgs').style.display = 'none';
+}
+
+function pvHelp() {
+  const b = $('pvBehavior').value;
+  const tips = {
+    domain: '🌐 每行一个域名或域名后缀（例: example.com / .google.com）',
+    ipcidr: '📡 每行一个 IP 网段（例: 1.2.3.0/24），保存时自动校验格式',
+    classical: '🧩 每行一条完整规则（例: DOMAIN-SUFFIX,example.com），不带策略组；不允许 MATCH / RULE-SET',
+  };
+  $('pvHelpText').textContent = tips[b] || '';
+}
+
+async function saveProv() {
+  const name = $('pvName').value.trim();
+  const behavior = $('pvBehavior').value;
+  const lines = $('pvLines').value.split('\n').map(s => s.trim()).filter(Boolean);
+  if (!name) { showMsgs($('pvMsgs'), [{ type: 'err', text: '请填写规则集名称' }]); return; }
+  if (!lines.length) { showMsgs($('pvMsgs'), [{ type: 'err', text: '内容不能为空' }]); return; }
+  const btn = $('pvSaveBtn');
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span> 校验并热加载中…';
+  showMsgs($('pvMsgs'), []);
+  try {
+    const overwrite = $('pvName').disabled;
+    let r;
+    if (overwrite) {
+      r = await api('PUT', '/api/providers/' + encodeURIComponent(name), { behavior, lines });
+    } else {
+      r = await api('POST', '/api/providers', { name, behavior, lines });
+    }
+    const msgs = [{ type: 'ok', text: '✅ ' + (r.message || '已保存') }];
+    if (r.backup) msgs.push({ type: 'info', text: `配置已备份: ${r.backup} | ${r.reload || ''}` });
+    showMsgs($('pvMsgs'), msgs);
+    setTimeout(() => { closeProvModal(); }, 1200);
+    await loadProviders();
+  } catch (e) {
+    showMsgs($('pvMsgs'), [{ type: 'err', text: String(e) }]);
+  } finally {
+    btn.disabled = false; btn.textContent = '💾 保存并生效';
+  }
+}
+
+async function delProvider(p) {
+  if (!confirm(`确定删除本地规则集「${p.name}」？\n⚠️ 若有规则行引用它，需先删除对应规则行`)) return;
+  showMsgs($('ruleMsgs'), []);
+  try {
+    const r = await api('DELETE', '/api/providers/' + encodeURIComponent(p.name));
+    showMsgs($('ruleMsgs'), [{ type: 'ok', text: `🗑 ${r.message || '已删除'}` }]);
+    await loadProviders();
+  } catch (e) {
+    showMsgs($('ruleMsgs'), [{ type: 'err', text: String(e) }]);
+  }
+}
+
+/* ---------- 初始化 ---------- */
+loadState();
+setInterval(() => { loadState().catch(() => {}); }, 15000);
+if (!$('panelRules').classList.contains('hidden')) loadRules();
+</script>
+</body>
+</html>

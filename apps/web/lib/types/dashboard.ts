@@ -20,4 +20,9 @@ export type TabId =
   | "proxies"
   | "rules"
   | "network"
-  | "health";
+  | "health"
+  | "nodes"
+  | "daemon"
+  | "rulecfg"
+  | "diag"
+  | "ops";

@@ -66,3 +66,7 @@ next-env.d.ts
 .claude/*
 !.claude/skills/
 .refactoring_docs/
+
+# python
+__pycache__/
+*.pyc
