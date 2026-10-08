@@ -6,6 +6,7 @@ import type { SummaryFieldKey, SummaryFieldMask } from './websocket.types.js';
 import { AuthService } from '../auth/auth.service.js';
 import { IncomingMessage } from 'http';
 import { URL } from 'url';
+import { readCookie } from '../../shared/utils/cookie-header.js';
 
 export interface WebSocketMessage {
   type: 'stats' | 'ping' | 'pong' | 'subscribe';
@@ -230,16 +231,8 @@ export class StatsWebSocketServer {
         let token = url.searchParams.get('token');
         
         // Try getting token from cookie if not in URL
-        if (!token && req.headers.cookie) {
-          const cookies = req.headers.cookie.split(';').reduce((acc, cookie) => {
-            const [key, value] = cookie.trim().split('=');
-            acc[key] = value;
-            return acc;
-          }, {} as Record<string, string>);
-          
-          if (cookies['neko-session']) {
-            token = cookies['neko-session'];
-          }
+        if (!token) {
+          token = readCookie(req.headers.cookie, 'neko-session');
         }
         
         // Check if auth is required and verify token
