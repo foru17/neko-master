@@ -165,7 +165,7 @@ export class RuleRepository extends BaseRepository {
           domains: row.domains ? row.domains.split(',').filter(Boolean) : [],
           chains: this.expandShortChainsForRules(backendId, chains, [rule]),
           asn: row.asn || undefined,
-          geoIP: row.geoIPData ? JSON.parse(row.geoIPData).filter(Boolean) : undefined,
+          geoIP: row.geoIPData ? JSON.parse(row.geoIPData) : undefined,
         };
       }) as IPStats[];
     }
@@ -193,7 +193,7 @@ export class RuleRepository extends BaseRepository {
       domains: row.domains ? row.domains.split(',').filter(Boolean) : [],
       chains: this.expandShortChainsForRules(backendId, row.chains ? row.chains.split(',').filter(Boolean) : [], [rule]),
       asn: row.asn || undefined,
-      geoIP: row.geoIPData ? JSON.parse(row.geoIPData).filter(Boolean) : undefined,
+      geoIP: row.geoIPData ? JSON.parse(row.geoIPData) : undefined,
     })) as IPStats[];
   }
 

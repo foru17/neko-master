@@ -115,7 +115,7 @@ export class ProxyRepository extends BaseRepository {
 
     return rows.map(row => ({
       ...row, domains: row.domains ? row.domains.split(',').filter(Boolean) : [], chains: [chain],
-      geoIP: geoMap.get(row.ip) ? JSON.parse(geoMap.get(row.ip)!).filter(Boolean) : undefined,
+      geoIP: geoMap.get(row.ip) ? JSON.parse(geoMap.get(row.ip)!) : undefined,
     })) as IPStats[];
   }
 }
