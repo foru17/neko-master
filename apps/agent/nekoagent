@@ -240,7 +240,8 @@ set -- "\$AGENT_BIN" \
   --gateway-url "\$NEKO_GATEWAY_URL"
 
 [ -n "\${NEKO_GATEWAY_TOKEN:-}" ] && set -- "\$@" --gateway-token "\$NEKO_GATEWAY_TOKEN"
-set -- "\$@" --gateway-insecure-tls="\${NEKO_GATEWAY_INSECURE_TLS:-false}"
+# Only pass the flag when enabled: older agent binaries reject unknown flags.
+case "\${NEKO_GATEWAY_INSECURE_TLS:-}" in 1|true|TRUE|True|yes) set -- "\$@" --gateway-insecure-tls ;; esac
 [ -n "\${NEKO_AGENT_ID:-}" ] && set -- "\$@" --agent-id "\$NEKO_AGENT_ID"
 [ -n "\${NEKO_REPORT_INTERVAL:-}" ] && set -- "\$@" --report-interval "\$NEKO_REPORT_INTERVAL"
 [ -n "\${NEKO_HEARTBEAT_INTERVAL:-}" ] && set -- "\$@" --heartbeat-interval "\$NEKO_HEARTBEAT_INTERVAL"
@@ -782,7 +783,10 @@ build_agent_args() {
   if [ -n "${NEKO_GATEWAY_TOKEN:-}" ]; then
     set -- "$@" --gateway-token "$NEKO_GATEWAY_TOKEN"
   fi
-  set -- "$@" --gateway-insecure-tls="${NEKO_GATEWAY_INSECURE_TLS:-false}"
+  # Only pass the flag when enabled: older agent binaries reject unknown flags.
+  case "${NEKO_GATEWAY_INSECURE_TLS:-}" in
+    1|true|TRUE|True|yes) set -- "$@" --gateway-insecure-tls ;;
+  esac
   if [ -n "${NEKO_AGENT_ID:-}" ]; then
     set -- "$@" --agent-id "$NEKO_AGENT_ID"
   fi
