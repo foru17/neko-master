@@ -69,3 +69,6 @@ next-env.d.ts
 
 # Local Go agent build output
 apps/agent/agent
+
+# UI acceptance screenshots
+.ui-acceptance/
