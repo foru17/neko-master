@@ -1,6 +1,6 @@
 {
   "name": "neko-master",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Modern traffic analytics for edge gateways",
   "private": true,
   "workspaces": [

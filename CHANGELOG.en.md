@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1] - 2026-10-09
+
+This release addresses bug and compatibility reports from GitHub issues.
+
+### Fixed
+
+- **Huge traffic spike after upgrading/restarting** ([#50], thanks @PlutoNameless) 🐛
+  - Gateways report cumulative bytes per connection. After a collector or agent restart (e.g. a container upgrade), the first snapshot counted the full history of every already-open long-lived connection again, adding tens of GB within minutes. Connections whose gateway start time (mihomo `start` / Surge `startDate`) is more than 5s before the process start now only establish a baseline, and later deltas are counted normally. Connections without a start time keep the old behavior, so no traffic is dropped. This applies to the direct mihomo collector, the Surge poller and the Go agent
+  - **Behavior change**: the pre-restart history of connections open at restart time is no longer counted (it was double counting), so the curve at upgrade time is lower than before
+- **Idle agents keep showing offline** ([#58], thanks @yf-9186) 🐛
+  - The offline timeout default (30s) equaled the agent heartbeat interval (30s), agents skip reports when there is no traffic, and the backend list and manual test used an 8s window, so healthy idle agents showed offline most of the time. All checks now use the heartbeat timeout, which defaults to 90s (3 × the heartbeat interval) and can be set with `AGENT_HEARTBEAT_TIMEOUT_MS` (minimum 15000). **Behavior change**: an agent that really goes down is marked offline after up to 90s
+- **`fetch failed` when Surge `http-api-tls` is enabled** ([#88], thanks @fgprodigal) 🐛
+  - Surge `http-api-tls` and mihomo `external-controller-tls` use self-signed certificates, so every gateway request failed with a bare `fetch failed`. Poll and test-connection errors now include the underlying cause (e.g. `DEPTH_ZERO_SELF_SIGNED_CERT`, `ECONNREFUSED`), with a hint for certificate errors
+  - New `BACKEND_TLS_INSECURE=1` skips certificate verification for gateway APIs only, with a one-time startup warning. GeoIP, ClickHouse and other outbound requests still verify certificates. Use only on trusted networks
+- **Trend chart tooltip wrong for ranges over 24 hours** ([#82], thanks @pengbins) 🐛
+  - Fixed daily bucketing in the realtime merger and store, and raised the query bucket limit to 1440 minutes
+- **PWA forced to portrait on tablets** ([#73], thanks @ICEY16360): manifest `orientation` changed from `natural` to `any`
+
+### Agent (shipped as `agent-v1.4.6`)
+
+- **`nekoagent status` shows stopped on OpenWrt** ([#71], thanks @yf-9186): the procd init script now writes a pidfile (`/var/run/neko-agent/<name>.pid`), so `status` reports the running state and PID. The docs for hand-written init scripts are updated in both languages
+- **New `--gateway-insecure-tls`** ([#88]): env `NEKO_GATEWAY_INSECURE_TLS`. Skips certificate verification for gateway APIs only; reporting to the collector still verifies certificates. `nekoagent add` accepts and persists it. The flag is passed to the agent only when enabled, so instances whose wrapper is upgraded before the binary still start
+- Fixed double counting of long-lived connections after a restart ([#50], see above). The report protocol version is unchanged
+
+[#50]: https://github.com/foru17/neko-master/issues/50
+[#58]: https://github.com/foru17/neko-master/issues/58
+[#71]: https://github.com/foru17/neko-master/issues/71
+[#73]: https://github.com/foru17/neko-master/issues/73
+[#82]: https://github.com/foru17/neko-master/issues/82
+[#88]: https://github.com/foru17/neko-master/issues/88
+
 ## [1.4.0] - 2026-07-19
 
 This release comes from a second external deep code review. Each finding was independently verified before fixing; the high-priority ones — data correctness, security defaults, error visibility, and a live install failure — are addressed here.

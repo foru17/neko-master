@@ -5,6 +5,37 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/spec/v2.0.0.html)。
 
+## [1.4.1] - 2026-10-09
+
+本版本集中处理 GitHub 上反馈的 bug 与兼容问题。
+
+### 修复
+
+- **升级/重启后流量出现巨大尖峰**（[#50]，感谢 @PlutoNameless）🐛
+  - 网关上报的是每条连接的累计字节数。collector 或 agent 重启（例如升级容器）后，首轮快照会把所有已存在长连接的历史累计量当作新增流量再记一遍，10 分钟内凭空多出数十 GB。现在，网关开始时间（mihomo `start` / Surge `startDate`）早于进程启动 5 秒以上的连接只建立基线，此后的增量照常计入；没有开始时间的连接保持旧行为，不丢数据。mihomo 直连、Surge 轮询与 Go agent 三条路径一致生效
+  - **行为变化**：重启瞬间已存在连接的历史累计量不再计入（这部分本来就是重复计数），所以升级时刻的曲线会比以前"低"
+- **Agent 空闲时频繁显示离线**（[#58]，感谢 @yf-9186）🐛
+  - 离线判定超时默认值（30 秒）与 agent 心跳间隔（30 秒）相同，再加上没有流量时 agent 不上报，后端列表与手动测试还用的是 8 秒窗口，空闲但健康的 agent 大部分时间都会显示离线。现在统一使用心跳超时，默认改为 90 秒（心跳间隔的 3 倍），可用 `AGENT_HEARTBEAT_TIMEOUT_MS` 调整（最小 15000）。**行为变化**：agent 真正掉线后，最多 90 秒才会标记为离线
+- **Surge 开启 `http-api-tls` 后报 `fetch failed`**（[#88]，感谢 @fgprodigal）🐛
+  - Surge `http-api-tls` 与 mihomo `external-controller-tls` 使用自签证书，所有网关请求都会失败，而且只显示一句笼统的 `fetch failed`。现在轮询和测试连接的报错会带上底层原因（如 `DEPTH_ZERO_SELF_SIGNED_CERT`、`ECONNREFUSED`），证书类错误会附带处理提示
+  - 新增 `BACKEND_TLS_INSECURE=1`：仅对网关 API 跳过证书校验，启动时打印一次警告；GeoIP、ClickHouse 等其他出站请求仍正常校验。只建议在可信局域网内使用
+- **趋势图选择超过 24 小时的范围时 Tooltip 不准确**（[#82]，感谢 @pengbins）🐛
+  - 修正 realtime 合并与存储中的按日分桶，并把查询的分桶上限放宽到 1440 分钟
+- **平板安装 PWA 后被强制竖屏**（[#73]，感谢 @ICEY16360）：manifest 的 `orientation` 从 `natural` 改为 `any`
+
+### Agent（随 `agent-v1.4.6` 发布）
+
+- **OpenWrt 上 `nekoagent status` 显示 stopped**（[#71]，感谢 @yf-9186）：procd init 脚本现在会写入 pidfile（`/var/run/neko-agent/<name>.pid`），`status` 可以正确显示运行状态与 PID；手写 init 脚本的中英文文档同步更新
+- **新增 `--gateway-insecure-tls`**（[#88]）：对应环境变量 `NEKO_GATEWAY_INSECURE_TLS`，仅跳过网关 API 的证书校验，向 collector 上报仍然校验证书。`nekoagent add` 支持该参数并会持久化；只有启用时才把该参数传给 agent，所以先升级管理脚本、后升级二进制的实例也能正常启动
+- 修复重启后长连接流量被重复计入的问题（[#50]，见上）。上报协议版本不变
+
+[#50]: https://github.com/foru17/neko-master/issues/50
+[#58]: https://github.com/foru17/neko-master/issues/58
+[#71]: https://github.com/foru17/neko-master/issues/71
+[#73]: https://github.com/foru17/neko-master/issues/73
+[#82]: https://github.com/foru17/neko-master/issues/82
+[#88]: https://github.com/foru17/neko-master/issues/88
+
 ## [1.4.0] - 2026-07-19
 
 本版本源自第二次外部深度代码评审，逐条证伪核验后修复其中的高优先级问题：数据正确性、安全默认值、错误可见性，以及一处当前正在发生的安装故障。
