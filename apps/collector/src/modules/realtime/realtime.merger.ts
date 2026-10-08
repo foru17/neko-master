@@ -22,10 +22,15 @@ function toMinuteKey(tsMs: number): string {
   return `${iso.slice(0, 16)}:00`;
 }
 
-function bucketMinuteKey(minuteKey: string, bucketMinutes: number): string {
+function bucketMinuteKey(minuteKey: string, bucketMinutes: number, tzOffsetMinutes = 0): string {
   if (bucketMinutes <= 1) return minuteKey;
   const timestampMs = Date.parse(`${minuteKey}Z`);
   if (!Number.isFinite(timestampMs)) return minuteKey;
+  if (bucketMinutes >= 1440 && tzOffsetMinutes !== 0) {
+    const dayMs = 1440 * 60 * 1000;
+    const offsetMs = tzOffsetMinutes * 60 * 1000;
+    return toMinuteKey(Math.floor((timestampMs + offsetMs) / dayMs) * dayMs - offsetMs);
+  }
   const bucketMs = Math.floor(bucketMinutes) * 60 * 1000;
   return toMinuteKey(Math.floor(timestampMs / bucketMs) * bucketMs);
 }
@@ -158,6 +163,7 @@ export class RealtimeMerger {
     minutes: number,
     bucketMinutes = 1,
     nowMs = Date.now(),
+    tzOffsetMinutes = 0,
   ): TrafficTrendPoint[] {
     const minuteMap = this.store.minuteByBackend.get(backendId);
     if (!minuteMap || minuteMap.size === 0) return basePoints;
@@ -167,7 +173,7 @@ export class RealtimeMerger {
 
     for (const [minuteKey, bucket] of minuteMap) {
       if (minuteKey < cutoffKey) continue;
-      const bucketKey = bucketMinuteKey(minuteKey, bucketMinutes);
+      const bucketKey = bucketMinuteKey(minuteKey, bucketMinutes, tzOffsetMinutes);
       const existing = deltaMap.get(bucketKey);
       if (existing) {
         existing.upload += bucket.upload;

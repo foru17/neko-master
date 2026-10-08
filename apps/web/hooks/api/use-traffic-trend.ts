@@ -8,6 +8,7 @@ interface UseTrafficTrendOptions {
   activeBackendId?: number;
   minutes?: number;
   bucketMinutes?: number;
+  tzOffsetMinutes?: number;
   range?: TimeRange;
   enabled?: boolean;
   refetchInterval?: number | false | ((query: any) => number | false);
@@ -19,19 +20,21 @@ export function useTrafficTrend({
   activeBackendId,
   minutes = 30,
   bucketMinutes = 1,
+  tzOffsetMinutes,
   range,
   enabled = true,
   refetchInterval,
 }: UseTrafficTrendOptions) {
   return useQuery({
-    queryKey: getTrafficTrendQueryKey(activeBackendId, minutes, bucketMinutes, range),
+    queryKey: getTrafficTrendQueryKey(activeBackendId, minutes, bucketMinutes, range, tzOffsetMinutes),
     queryFn: async () => {
       if (!activeBackendId) throw new Error("Backend ID is required");
       return api.getTrafficTrendAggregated(
         activeBackendId,
         minutes,
         bucketMinutes,
-        range
+        range,
+        tzOffsetMinutes
       );
     },
     enabled: !!activeBackendId && enabled,

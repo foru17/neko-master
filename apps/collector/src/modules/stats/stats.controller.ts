@@ -755,14 +755,19 @@ const statsController: FastifyPluginAsync = async (fastify: FastifyInstance): Pr
     }
 
     const query = request.query as Record<string, string | undefined>;
-    const { minutes = '30', bucketMinutes = '1' } = query;
+    const { minutes = '30', bucketMinutes = '1', tzOffsetMinutes } = query;
     const windowMinutes = service.parseLimit(minutes, 30, 60 * 24 * 7);
     const bucket = service.parseLimit(bucketMinutes, 1, 24 * 60);
+    const parsedOffset = typeof tzOffsetMinutes === 'string' ? Number(tzOffsetMinutes) : 0;
+    const timezoneOffset = Number.isFinite(parsedOffset)
+      ? Math.max(-840, Math.min(840, Math.trunc(parsedOffset)))
+      : 0;
     return await service.getTrafficTrendAggregatedWithRouting(
       backendId,
       timeRange,
       windowMinutes,
       bucket,
+      timezoneOffset,
     );
   });
 

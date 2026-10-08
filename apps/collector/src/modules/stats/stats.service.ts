@@ -1474,17 +1474,34 @@ export class StatsService {
   /**
    * Get traffic trend aggregated by time buckets for chart display
    */
+  private getTrafficTrendAggregatedBase(
+    backendId: number,
+    timeRange: TimeRange,
+    minutes: number,
+    bucketMinutes: number,
+    tzOffsetMinutes: number,
+  ): TrafficTrendPoint[] {
+    if (bucketMinutes >= 1440 && tzOffsetMinutes !== 0) {
+      // The legacy DB facade cache has no timezone dimension.
+      return this.db.repos.timeseries.getTrafficTrendAggregated(
+        backendId, minutes, bucketMinutes, timeRange.start, timeRange.end, tzOffsetMinutes,
+      );
+    }
+    return this.db.getTrafficTrendAggregated(backendId, minutes, bucketMinutes, timeRange.start, timeRange.end);
+  }
+
   getTrafficTrendAggregated(
     backendId: number,
     timeRange: TimeRange,
     minutes: number,
     bucketMinutes: number,
+    tzOffsetMinutes = 0,
   ): TrafficTrendPoint[] {
-    const base = this.db.getTrafficTrendAggregated(backendId, minutes, bucketMinutes, timeRange.start, timeRange.end);
+    const base = this.getTrafficTrendAggregatedBase(backendId, timeRange, minutes, bucketMinutes, tzOffsetMinutes);
     if (!this.shouldIncludeRealtime(timeRange)) {
       return base;
     }
-    return this.realtimeStore.mergeTrend(backendId, base, minutes, bucketMinutes);
+    return this.realtimeStore.mergeTrend(backendId, base, minutes, bucketMinutes, undefined, tzOffsetMinutes);
   }
 
   async getTrafficTrendAggregatedWithRouting(
@@ -1492,6 +1509,7 @@ export class StatsService {
     timeRange: TimeRange,
     minutes: number,
     bucketMinutes: number,
+    tzOffsetMinutes = 0,
   ): Promise<TrafficTrendPoint[]> {
     const queryRange = this.resolveQueryRange(timeRange, Math.max(1, minutes));
     const shouldUseCH =
@@ -1505,16 +1523,17 @@ export class StatsService {
             bucketMinutes,
             queryRange.start,
             queryRange.end,
+            tzOffsetMinutes,
           )
         : null;
     const base =
       chBase ||
-      this.db.getTrafficTrendAggregated(
+      this.getTrafficTrendAggregatedBase(
         backendId,
+        timeRange,
         minutes,
         bucketMinutes,
-        timeRange.start,
-        timeRange.end,
+        tzOffsetMinutes,
       );
     if (!chBase) {
       this.failIfStrictFallback('trend.aggregated');
@@ -1524,7 +1543,7 @@ export class StatsService {
     if (!this.shouldIncludeRealtime(timeRange)) {
       return base;
     }
-    return this.realtimeStore.mergeTrend(backendId, base, minutes, bucketMinutes);
+    return this.realtimeStore.mergeTrend(backendId, base, minutes, bucketMinutes, undefined, tzOffsetMinutes);
   }
 
   /**

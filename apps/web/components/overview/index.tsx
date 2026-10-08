@@ -193,6 +193,7 @@ export function OverviewTab({
     }
 
     const bucketMinutes = granularity === "day" ? 24 * 60 : getMinuteBucket(durationMs);
+    const tzOffsetMinutes = granularity === "day" ? -new Date().getTimezoneOffset() : undefined;
     const minutes = Math.max(1, Math.ceil(durationMs / 60000));
     const realtime = queryEnd.getTime() >= Date.now() - REALTIME_END_TOLERANCE_MS;
 
@@ -202,6 +203,7 @@ export function OverviewTab({
       durationMs,
       minutes,
       bucketMinutes,
+      tzOffsetMinutes,
       granularity,
       realtime,
     };
@@ -227,7 +229,8 @@ export function OverviewTab({
         activeBackendId, 
         trendQuery.minutes, 
         trendQuery.bucketMinutes, 
-        { start: trendQuery.start, end: trendQuery.end }
+        { start: trendQuery.start, end: trendQuery.end },
+        trendQuery.tzOffsetMinutes
       );
       
       queryClient.setQueryData(queryKey, stats.trendStats);
@@ -240,6 +243,7 @@ export function OverviewTab({
     activeBackendId,
     minutes: trendQuery.minutes,
     bucketMinutes: trendQuery.bucketMinutes,
+    tzOffsetMinutes: trendQuery.tzOffsetMinutes,
     range: { start: trendQuery.start, end: trendQuery.end },
     enabled: !!activeBackendId,
     refetchInterval: wsTrendEnabled && wsTrendConnected ? 90000 : false,

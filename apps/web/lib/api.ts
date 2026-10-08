@@ -286,12 +286,13 @@ export const api = {
       end: range?.end,
     })),
     
-  getTrafficTrendAggregated: (backendId?: number, minutes = 30, bucketMinutes = 1, range?: TimeRange) =>
+  getTrafficTrendAggregated: (backendId?: number, minutes = 30, bucketMinutes = 1, range?: TimeRange, tzOffsetMinutes?: number) =>
     fetchJson<TrafficTrendPoint[]>(
       buildUrl(`${API_BASE}/stats/trend/aggregated`, {
         backendId,
         minutes,
         bucketMinutes,
+        tzOffsetMinutes: bucketMinutes >= 1440 ? tzOffsetMinutes : undefined,
         start: range?.start,
         end: range?.end,
       })

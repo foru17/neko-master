@@ -122,6 +122,7 @@ export class TimeseriesRepository extends BaseRepository {
     bucketMinutes = 1,
     start?: string,
     end?: string,
+    tzOffsetMinutes = 0,
   ): Array<{ time: string; upload: number; download: number }> {
     const range = this.parseMinuteRange(start, end);
     const cutoff = new Date(Date.now() - minutes * 60 * 1000);
@@ -135,6 +136,28 @@ export class TimeseriesRepository extends BaseRepository {
       const endHour = this.toHourKey(new Date(endMinute));
 
       if (bucketMinutes >= 1440) {
+        if (tzOffsetMinutes !== 0) {
+          // Shift to the caller's local day, truncate, then return its UTC start.
+          const bucketExpr = `strftime('%Y-%m-%dT%H:%M:00', hour, @offset, 'start of day', @reverseOffset)`;
+          const stmt = this.db.prepare(`
+            SELECT
+              ${bucketExpr} as time,
+              SUM(upload) as upload,
+              SUM(download) as download
+            FROM hourly_stats
+            WHERE backend_id = @backendId AND hour >= @startHour AND hour <= @endHour
+            GROUP BY ${bucketExpr}
+            ORDER BY time ASC
+          `);
+          return stmt.all({
+            backendId,
+            startHour,
+            endHour,
+            offset: `${tzOffsetMinutes} minutes`,
+            reverseOffset: `${-tzOffsetMinutes} minutes`,
+          }) as Array<{ time: string; upload: number; download: number }>;
+        }
+
         // Daily bucket: group by date
         const stmt = this.db.prepare(`
           SELECT

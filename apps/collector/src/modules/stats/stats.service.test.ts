@@ -1,8 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createTestDatabase, createTestBackend } from '../../__tests__/helpers.js';
 import { StatsService } from './stats.service.js';
 import { realtimeStore } from '../realtime/realtime.store.js';
 import type { StatsDatabase } from '../db/db.js';
+import { ClickHouseReader } from '../clickhouse/clickhouse.reader.js';
 
 describe('StatsService', () => {
   let db: StatsDatabase;
@@ -17,6 +18,7 @@ describe('StatsService', () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     realtimeStore.clearBackend(backendId);
     cleanup();
   });
@@ -201,6 +203,46 @@ describe('StatsService', () => {
         end: '2020-01-02T00:00:00Z',
       })).toBe(false);
     });
+  });
+
+  describe('daily trend timezone routing', () => {
+    it.each(['sqlite', 'clickhouse', 'unrouted'] as const)(
+      'merges persisted and realtime data in the same local day through %s',
+      async (source) => {
+        const nowMs = Date.parse('2026-10-09T12:00:00Z');
+        vi.spyOn(Date, 'now').mockReturnValue(nowMs);
+        vi.spyOn(ClickHouseReader.prototype, 'shouldUseForRange')
+          .mockReturnValue(source === 'clickhouse');
+        const chTrend = vi.spyOn(ClickHouseReader.prototype, 'getTrafficTrendAggregated')
+          .mockResolvedValue([{ time: '2026-10-08T16:00:00', upload: 3, download: 4 }]);
+        db.batchUpdateTrafficStats(backendId, [{
+          domain: 'example.com',
+          ip: '203.0.113.1',
+          chain: 'DIRECT',
+          chains: ['DIRECT'],
+          rule: 'Match',
+          rulePayload: '',
+          upload: 3,
+          download: 4,
+          timestampMs: Date.parse('2026-10-08T19:00:00Z'),
+        }]);
+        realtimeStore.minuteByBackend.set(backendId, new Map([
+          ['2026-10-08T20:00:00', { upload: 5, download: 6, lastUpdated: nowMs }],
+        ]));
+        const range = { active: true, start: '2026-10-08T00:00:00Z', end: '2026-10-09T12:00:00Z' };
+
+        const result = source === 'unrouted'
+          ? service.getTrafficTrendAggregated(backendId, range, 1440, 1440, 480)
+          : await service.getTrafficTrendAggregatedWithRouting(backendId, range, 1440, 1440, 480);
+
+        expect(result).toEqual([{ time: '2026-10-08T16:00:00', upload: 8, download: 10 }]);
+        if (source === 'clickhouse') {
+          expect(chTrend).toHaveBeenCalledWith(backendId, 1440, range.start, range.end, 480);
+        } else {
+          expect(chTrend).not.toHaveBeenCalled();
+        }
+      },
+    );
   });
 
   describe('strict mode routing', () => {

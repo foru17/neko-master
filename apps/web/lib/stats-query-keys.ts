@@ -79,6 +79,7 @@ export function getTrafficTrendQueryKey(
   minutes = 30,
   bucketMinutes = 1,
   range?: TimeRange,
+  tzOffsetMinutes?: number,
 ) {
   return [
     "stats",
@@ -87,6 +88,7 @@ export function getTrafficTrendQueryKey(
       backendId: backendId ?? null,
       minutes,
       bucketMinutes,
+      tzOffsetMinutes: bucketMinutes >= 1440 ? (tzOffsetMinutes ?? 0) : 0,
       ...normalizeRange(range),
     },
   ] as const;

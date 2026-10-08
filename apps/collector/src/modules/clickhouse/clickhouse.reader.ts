@@ -300,10 +300,14 @@ ORDER BY minute ASC
     bucketMinutes: number,
     start: string,
     end: string,
+    tzOffsetMinutes = 0,
   ): Promise<Array<{ time: string; upload: number; download: number }> | null> {
     const safeBucket = Math.max(1, Math.floor(bucketMinutes));
-    const bucketExpr =
-      safeBucket <= 1
+    const useLocalDay = safeBucket >= 1440 && tzOffsetMinutes !== 0;
+    const offsetSeconds = tzOffsetMinutes * 60;
+    const bucketExpr = useLocalDay
+      ? `toDateTime(toInt64(floor((toInt64(toUnixTimestamp(minute)) + (${offsetSeconds})) / 86400) * 86400 - (${offsetSeconds})), 'UTC')`
+      : safeBucket <= 1
         ? 'minute'
         : `toStartOfInterval(minute, INTERVAL ${safeBucket} MINUTE)`;
 
@@ -321,7 +325,7 @@ ORDER BY time ASC
 `);
     if (!rows) return null;
     return (rows as Array<any>).map((row) => ({
-      time: String(row.time || ''),
+      time: useLocalDay ? String(row.time || '').replace(' ', 'T') : String(row.time || ''),
       upload: Number(row.upload || 0),
       download: Number(row.download || 0),
     }));
