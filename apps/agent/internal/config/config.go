@@ -6,6 +6,8 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -29,6 +31,7 @@ type Config struct {
 	GatewayType         string
 	GatewayEndpoint     string
 	GatewayToken        string
+	GatewayInsecureTLS  bool
 	ReportInterval      time.Duration
 	HeartbeatInterval   time.Duration
 	GatewayPollInterval time.Duration
@@ -49,6 +52,7 @@ func Parse(args []string) (Config, error) {
 	gatewayType := fs.String("gateway-type", "clash", "Gateway type: clash or surge")
 	gatewayURL := fs.String("gateway-url", "", "Gateway control endpoint URL")
 	gatewayToken := fs.String("gateway-token", "", "Gateway secret token (optional)")
+	gatewayInsecureTLS := fs.Bool("gateway-insecure-tls", false, "Skip gateway TLS certificate verification (trusted LAN only; env NEKO_GATEWAY_INSECURE_TLS)")
 	logEnabled := fs.Bool("log", true, "Enable runtime logs (set false to disable)")
 
 	reportInterval := fs.Duration("report-interval", 2*time.Second, "Report interval, e.g. 2s")
@@ -73,6 +77,20 @@ func Parse(args []string) (Config, error) {
 	}
 	if *showVersion {
 		return Config{}, ErrVersion
+	}
+
+	gatewayInsecureTLSSet := false
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == "gateway-insecure-tls" {
+			gatewayInsecureTLSSet = true
+		}
+	})
+	if value := strings.TrimSpace(os.Getenv("NEKO_GATEWAY_INSECURE_TLS")); value != "" && !gatewayInsecureTLSSet {
+		enabled, err := strconv.ParseBool(value)
+		if err != nil {
+			return Config{}, fmt.Errorf("invalid NEKO_GATEWAY_INSECURE_TLS: %w", err)
+		}
+		*gatewayInsecureTLS = enabled
 	}
 
 	if strings.TrimSpace(*serverURL) == "" || *backendID <= 0 || strings.TrimSpace(*backendToken) == "" || strings.TrimSpace(*gatewayURL) == "" {
@@ -115,6 +133,7 @@ func Parse(args []string) (Config, error) {
 		GatewayType:         gt,
 		GatewayEndpoint:     normalizeGatewayEndpoint(gt, *gatewayURL),
 		GatewayToken:        strings.TrimSpace(*gatewayToken),
+		GatewayInsecureTLS:  *gatewayInsecureTLS,
 		ReportInterval:      *reportInterval,
 		HeartbeatInterval:   *heartbeatInterval,
 		GatewayPollInterval: *gatewayPollInterval,
@@ -141,6 +160,7 @@ func Usage() string {
 		"  --log                   enable runtime logs (default true, set --log=false to disable)",
 		"  --gateway-type          clash|surge (default clash)",
 		"  --gateway-token         Gateway secret",
+		"  --gateway-insecure-tls  Skip gateway TLS certificate verification (default false; env NEKO_GATEWAY_INSECURE_TLS; trusted LAN only)",
 		"  --report-interval       default 2s",
 		"  --heartbeat-interval    default 30s",
 		"  --gateway-poll-interval default 2s",

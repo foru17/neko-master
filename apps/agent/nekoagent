@@ -240,6 +240,7 @@ set -- "\$AGENT_BIN" \
   --gateway-url "\$NEKO_GATEWAY_URL"
 
 [ -n "\${NEKO_GATEWAY_TOKEN:-}" ] && set -- "\$@" --gateway-token "\$NEKO_GATEWAY_TOKEN"
+set -- "\$@" --gateway-insecure-tls="\${NEKO_GATEWAY_INSECURE_TLS:-false}"
 [ -n "\${NEKO_AGENT_ID:-}" ] && set -- "\$@" --agent-id "\$NEKO_AGENT_ID"
 [ -n "\${NEKO_REPORT_INTERVAL:-}" ] && set -- "\$@" --report-interval "\$NEKO_REPORT_INTERVAL"
 [ -n "\${NEKO_HEARTBEAT_INTERVAL:-}" ] && set -- "\$@" --heartbeat-interval "\$NEKO_HEARTBEAT_INTERVAL"
@@ -699,6 +700,7 @@ Quick add with flags (auto-starts by default):
     --gateway-type <clash|surge> \
     --gateway-url <url> \
     [--gateway-token <token>] \
+    [--gateway-insecure-tls] \
     [--no-start]        # skip auto-start after add
 
 Upgrade examples:
@@ -713,7 +715,7 @@ Config and runtime paths:
 Required config keys:
   NEKO_SERVER, NEKO_BACKEND_ID, NEKO_BACKEND_TOKEN, NEKO_GATEWAY_TYPE, NEKO_GATEWAY_URL
 Optional keys:
-  NEKO_GATEWAY_TOKEN, NEKO_LOG, NEKO_AGENT_ID, NEKO_REPORT_INTERVAL,
+  NEKO_GATEWAY_TOKEN, NEKO_GATEWAY_INSECURE_TLS, NEKO_LOG, NEKO_AGENT_ID, NEKO_REPORT_INTERVAL,
   NEKO_HEARTBEAT_INTERVAL, NEKO_GATEWAY_POLL_INTERVAL, NEKO_REQUEST_TIMEOUT,
   NEKO_REPORT_BATCH_SIZE, NEKO_MAX_PENDING_UPDATES, NEKO_STALE_FLOW_TIMEOUT
 
@@ -780,6 +782,7 @@ build_agent_args() {
   if [ -n "${NEKO_GATEWAY_TOKEN:-}" ]; then
     set -- "$@" --gateway-token "$NEKO_GATEWAY_TOKEN"
   fi
+  set -- "$@" --gateway-insecure-tls="${NEKO_GATEWAY_INSECURE_TLS:-false}"
   if [ -n "${NEKO_AGENT_ID:-}" ]; then
     set -- "$@" --agent-id "$NEKO_AGENT_ID"
   fi
@@ -835,7 +838,7 @@ cmd_add() {
   if [ "$#" -lt 6 ]; then
     err "add requires: <name> --server-url <url> --backend-id <id> --backend-token <token> --gateway-type <type> --gateway-url <url>"
     echo ""
-    echo "Usage: $PROG add <name> --server-url <url> --backend-id <id> --backend-token <token> --gateway-type <clash|surge> --gateway-url <url> [--gateway-token <token>] [--auto-start]"
+    echo "Usage: $PROG add <name> --server-url <url> --backend-id <id> --backend-token <token> --gateway-type <clash|surge> --gateway-url <url> [--gateway-token <token>] [--gateway-insecure-tls] [--auto-start]"
     exit 1
   fi
 
@@ -849,6 +852,7 @@ cmd_add() {
   gateway_type=""
   gateway_url=""
   gateway_token=""
+  gateway_insecure_tls="${NEKO_GATEWAY_INSECURE_TLS:-false}"
   auto_start="true"   # default: start immediately after add
 
   while [ "$#" -gt 0 ]; do
@@ -876,6 +880,14 @@ cmd_add() {
       --gateway-token)
         gateway_token="$2"
         shift 2
+        ;;
+      --gateway-insecure-tls)
+        gateway_insecure_tls="true"
+        shift
+        ;;
+      --gateway-insecure-tls=*)
+        gateway_insecure_tls="${1#*=}"
+        shift
         ;;
       --auto-start)
         auto_start="true"
@@ -906,6 +918,7 @@ cmd_add() {
   config_vars="$config_vars NEKO_BACKEND_TOKEN=$backend_token"
   config_vars="$config_vars NEKO_GATEWAY_TYPE=$gateway_type"
   config_vars="$config_vars NEKO_GATEWAY_URL=$gateway_url"
+  config_vars="$config_vars NEKO_GATEWAY_INSECURE_TLS=$gateway_insecure_tls"
   if [ -n "$gateway_token" ]; then
     config_vars="$config_vars NEKO_GATEWAY_TOKEN=$gateway_token"
   fi

@@ -66,6 +66,14 @@ nekoagent uninstall
 3. Extract `neko-agent`
 4. Run executable with backend parameters
 
+### Optional gateway flags
+
+| Flag | Environment variable | Default | Description |
+| --- | --- | --- | --- |
+| `--gateway-insecure-tls` | `NEKO_GATEWAY_INSECURE_TLS` | `false` | Skip gateway API TLS certificate verification for self-signed Surge `http-api-tls` / mihomo `external-controller-tls` certificates. Use only on a trusted LAN. Server reporting still verifies certificates. |
+
+Append `--gateway-insecure-tls` to `nekoagent add` to persist the setting. For an existing instance, set `NEKO_GATEWAY_INSECURE_TLS=true` in `/etc/neko-agent/<name>.env` and restart it.
+
 ## OpenWrt note
 
 Before build selection, check architecture:

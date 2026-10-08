@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/md5"
 	"crypto/rand"
+	"crypto/tls"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -99,6 +100,14 @@ const preexistingFlowGraceMs = 5_000
 
 func NewRunner(cfg config.Config) *Runner {
 	httpClient := &http.Client{Timeout: cfg.RequestTimeout}
+	gatewayHTTPClient := &http.Client{Timeout: cfg.RequestTimeout}
+	if cfg.GatewayInsecureTLS {
+		transport := http.DefaultTransport.(*http.Transport).Clone()
+		// Explicit opt-in for self-signed gateway APIs on a trusted LAN only.
+		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+		gatewayHTTPClient.Transport = transport
+		log.Printf("[agent:%s] warning: gateway TLS certificate verification is disabled; use only on a trusted LAN", cfg.AgentID)
+	}
 	hostname, _ := os.Hostname()
 	if hostname == "" {
 		hostname = "unknown-host"
@@ -107,7 +116,7 @@ func NewRunner(cfg config.Config) *Runner {
 	return &Runner{
 		cfg:           cfg,
 		httpClient:    httpClient,
-		gatewayClient: gateway.NewClient(httpClient, cfg.GatewayType, cfg.GatewayEndpoint, cfg.GatewayToken),
+		gatewayClient: gateway.NewClient(gatewayHTTPClient, cfg.GatewayType, cfg.GatewayEndpoint, cfg.GatewayToken),
 		hostname:      hostname,
 		queue:         make([]domain.TrafficUpdate, 0, cfg.ReportBatchSize*2),
 		flows:         make(map[string]trackedFlow, 2048),

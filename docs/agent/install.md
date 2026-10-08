@@ -66,6 +66,14 @@ nekoagent uninstall
 3. 解压 `neko-agent`
 4. 携带后端参数直接运行可执行文件
 
+### 可选网关参数
+
+| Flag | 环境变量 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `--gateway-insecure-tls` | `NEKO_GATEWAY_INSECURE_TLS` | `false` | 跳过网关 API 的 TLS 证书校验，适用于 Surge `http-api-tls` / mihomo `external-controller-tls` 自签证书；仅在可信局域网内使用。上报服务端仍校验证书。 |
+
+使用 `nekoagent add` 时可追加 `--gateway-insecure-tls`，管理器会持久化该配置；已有实例可在 `/etc/neko-agent/<name>.env` 中设置 `NEKO_GATEWAY_INSECURE_TLS=true` 后重启。
+
 ## 安装了哪些文件
 
 安装脚本在 `NEKO_INSTALL_DIR`（默认 `~/.local/bin`）中放置两个二进制文件：

@@ -1,12 +1,77 @@
 package agent
 
 import (
+	"context"
+	"crypto/tls"
+	"errors"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/foru17/neko-master/apps/agent/internal/config"
 	"github.com/foru17/neko-master/apps/agent/internal/domain"
 )
+
+func TestGatewayInsecureTLS(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/connections":
+			_, _ = w.Write([]byte(`{"connections":[{"id":"tls-flow","upload":10,"download":20}]}`))
+		case "/v1/requests/recent":
+			_, _ = w.Write([]byte(`{"requests":[{"id":"tls-flow","outBytes":10,"inBytes":20}]}`))
+		case "/api/agent/report":
+			_, _ = w.Write([]byte(`{}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	for _, gatewayType := range []string{"clash", "surge"} {
+		t.Run(gatewayType, func(t *testing.T) {
+			// Check the default after opting in to catch mutation of DefaultTransport.
+			for _, tc := range []struct {
+				name     string
+				insecure bool
+			}{
+				{name: "enabled", insecure: true},
+				{name: "disabled", insecure: false},
+			} {
+				t.Run(tc.name, func(t *testing.T) {
+					runner := NewRunner(config.Config{
+						ServerAPIBase:      server.URL + "/api",
+						GatewayType:        gatewayType,
+						GatewayEndpoint:    server.URL,
+						GatewayInsecureTLS: tc.insecure,
+						RequestTimeout:     time.Second,
+					})
+					snapshots, err := runner.gatewayClient.Collect(context.Background())
+					if tc.insecure {
+						if err != nil {
+							t.Fatalf("gateway should accept a self-signed certificate when enabled: %v", err)
+						}
+						if len(snapshots) != 1 || snapshots[0].ID != "tls-flow" || snapshots[0].Upload != 10 || snapshots[0].Download != 20 {
+							t.Fatalf("unexpected gateway response: %+v", snapshots)
+						}
+					} else {
+						var verificationErr *tls.CertificateVerificationError
+						if !errors.As(err, &verificationErr) {
+							t.Fatalf("gateway should reject a self-signed certificate when disabled, got: %v", err)
+						}
+					}
+
+					err = runner.postJSON(context.Background(), "/agent/report", reportPayload{})
+					var verificationErr *tls.CertificateVerificationError
+					if !errors.As(err, &verificationErr) {
+						t.Fatalf("reporting must always reject a self-signed certificate, got: %v", err)
+					}
+				})
+			}
+		})
+	}
+}
 
 func TestIngestSnapshotsDeltaCalculation(t *testing.T) {
 	runner := NewRunner(config.Config{
