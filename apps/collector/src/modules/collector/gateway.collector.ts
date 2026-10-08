@@ -19,6 +19,34 @@ const CLEANUP_INTERVAL = 2 * 60 * 1000; // 2 minutes
 const DEFAULT_HEARTBEAT_INTERVAL = 10_000; // ping + liveness check cadence (ms)
 const DEFAULT_HEARTBEAT_TIMEOUT = 30_000; // terminate after this much silence (ms)
 
+// Stash uses { current, max, total, last } counters instead of Clash's numbers.
+// Normalize at the gateway boundary so batching and realtime deltas share the
+// same cumulative byte counts.
+function normalizeCounter(value: unknown): number {
+  const total = value && typeof value === "object" && "total" in value
+    ? value.total
+    : value;
+  return typeof total === "number" && Number.isFinite(total) && total >= 0
+    ? total
+    : 0;
+}
+
+function normalizeConnections(data: ConnectionsData): ConnectionsData {
+  if (!Array.isArray(data?.connections)) return data;
+  return {
+    ...data,
+    connections: data.connections.map((connection) => {
+      if (!connection || typeof connection !== "object") return connection;
+      return {
+        ...connection,
+        id: typeof connection.id === "number" ? String(connection.id) : connection.id,
+        upload: normalizeCounter(connection.upload),
+        download: normalizeCounter(connection.download),
+      };
+    }),
+  };
+}
+
 export interface CollectorOptions {
   url: string;
   token?: string;
@@ -99,7 +127,7 @@ export class GatewayCollector {
       this.lastActivity = Date.now();
       try {
         const json = JSON.parse(data.toString()) as ConnectionsData;
-        this.onData?.(json);
+        this.onData?.(normalizeConnections(json));
       } catch (err) {
         console.error(
           `[Collector:${this.backendId}] Failed to parse message:`,
