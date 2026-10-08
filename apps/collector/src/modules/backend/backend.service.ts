@@ -23,6 +23,7 @@ import { loadClickHouseConfig, runClickHouseQuery } from '../clickhouse/clickhou
 import type { ClickHouseConfig } from '../clickhouse/clickhouse.config.js';
 
 import type { AuthService } from '../auth/auth.service.js';
+import { describeGatewayError, gatewayFetch, gatewayWsTlsOptions } from '../../shared/utils/gateway-fetch.js';
 
 /**
  * Mask URL for showcase mode - hides host, port, credentials
@@ -633,7 +634,7 @@ export class BackendService {
       const WebSocket = (await import('ws')).default;
       
       return new Promise((resolve) => {
-        const ws = new WebSocket(fullUrl, { headers, timeout: 5000 });
+        const ws = new WebSocket(fullUrl, { headers, timeout: 5000, ...gatewayWsTlsOptions() });
         let settled = false;
         const timeout = setTimeout(() => {
           if (settled) return;
@@ -655,8 +656,7 @@ export class BackendService {
         });
 
         ws.on('error', (error: unknown) => {
-          const message = error instanceof Error ? error.message : 'Connection failed';
-          finish({ success: false, message });
+          finish({ success: false, message: describeGatewayError(error) });
         });
 
         ws.on('close', (code: number) => {
@@ -689,7 +689,7 @@ export class BackendService {
         headers['x-key'] = token;
       }
       
-      const response = await fetch(testUrl, {
+      const response = await gatewayFetch(testUrl, {
         headers,
         signal: AbortSignal.timeout(5000),
       });
@@ -712,7 +712,7 @@ export class BackendService {
         if (error.name === 'AbortError') {
           return { success: false, message: 'Connection timeout - check if Surge HTTP API is enabled' };
         }
-        return { success: false, message: error.message };
+        return { success: false, message: describeGatewayError(error) };
       }
       return { success: false, message: 'Connection failed' };
     }

@@ -6,6 +6,7 @@
  */
 
 import type { StatsDatabase } from '../db/db.js';
+import { gatewayFetch } from '../../shared/utils/gateway-fetch.js';
 
 interface SurgePolicyDetail {
   policyGroup: string;
@@ -74,7 +75,7 @@ export class SurgePolicySyncService {
 
     try {
       // 1. Get policy groups list
-      const res = await fetch(`${baseUrl}/v1/policies`, { 
+      const res = await gatewayFetch(`${baseUrl}/v1/policies`, { 
         headers,
         signal: AbortSignal.timeout(10000)
       });
@@ -133,7 +134,7 @@ export class SurgePolicySyncService {
   ): Promise<SurgePolicyDetail | null> {
     try {
       // Surge uses /v1/policy_groups/select?group_name=xxx endpoint
-      const res = await fetch(
+      const res = await gatewayFetch(
         `${baseUrl}/v1/policy_groups/select?group_name=${encodeURIComponent(groupName)}`,
         { headers, signal: AbortSignal.timeout(5000) }
       );

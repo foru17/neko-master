@@ -7,6 +7,7 @@ import { realtimeStore } from "../realtime/realtime.store.js";
 import { calculateBackoffDelay } from "../../shared/utils/backoff.js";
 import { BatchBuffer } from "./batch-buffer.js";
 import { isPreexistingConnection } from "./connection-baseline.js";
+import { gatewayWsTlsOptions } from "../../shared/utils/gateway-fetch.js";
 
 // Stale connection cleanup constants
 const STALE_CONNECTION_TIMEOUT = 5 * 60 * 1000; // 5 minutes
@@ -88,6 +89,7 @@ export class GatewayCollector {
     this.ws = new WebSocket(this.url, {
       headers,
       followRedirects: true,
+      ...gatewayWsTlsOptions(),
     });
 
     this.ws.on("open", () => {

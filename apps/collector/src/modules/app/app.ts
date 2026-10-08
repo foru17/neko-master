@@ -23,6 +23,7 @@ import { BackendService, backendController } from '../backend/index.js';
 import { StatsService, statsController } from '../stats/index.js';
 import { AuthService, authController } from '../auth/index.js';
 import { configController } from '../config/index.js';
+import { gatewayFetch } from '../../shared/utils/gateway-fetch.js';
 
 // Extend Fastify instance to include services
 declare module 'fastify' {
@@ -379,7 +380,7 @@ export async function createApp(options: AppOptions) {
   ): Promise<Map<string, number>> => {
     const map = new Map<string, number>();
     try {
-      const res = await fetch(`${gatewayBaseUrl}/providers/rules`, {
+      const res = await gatewayFetch(`${gatewayBaseUrl}/providers/rules`, {
         headers: { ...headers, 'Content-Type': 'application/json' },
         signal: AbortSignal.timeout(5000),
       });
@@ -959,7 +960,7 @@ export async function createApp(options: AppOptions) {
     try {
       if (isSurge) {
         // Surge: Get policies list and details
-        const res = await fetch(`${gatewayBaseUrl}/v1/policies`, { headers });
+        const res = await gatewayFetch(`${gatewayBaseUrl}/v1/policies`, { headers });
         if (!res.ok) {
           return reply.status(res.status).send({ error: `Surge API error: ${res.status}` });
         }
@@ -972,7 +973,7 @@ export async function createApp(options: AppOptions) {
         const groupDetails = await Promise.allSettled(
           policyGroups.map(async (groupName: string) => {
             try {
-              const detailRes = await fetch(
+              const detailRes = await gatewayFetch(
                 `${gatewayBaseUrl}/v1/policies/${encodeURIComponent(groupName)}`,
                 { headers, signal: AbortSignal.timeout(5000) }
               );
@@ -1002,7 +1003,7 @@ export async function createApp(options: AppOptions) {
         return { proxies };
       } else {
         // Clash/OpenClash: Direct proxy to /proxies endpoint
-        const res = await fetch(`${gatewayBaseUrl}/proxies`, { 
+        const res = await gatewayFetch(`${gatewayBaseUrl}/proxies`, { 
           headers: { ...headers, 'Content-Type': 'application/json' }
         });
         if (!res.ok) {
@@ -1066,7 +1067,7 @@ export async function createApp(options: AppOptions) {
         // If no cache or force refresh, fetch directly from Surge
         if (Object.keys(providers).length === 0 || forceRefresh) {
           try {
-            const res = await fetch(`${gatewayBaseUrl}/v1/policies`, { 
+            const res = await gatewayFetch(`${gatewayBaseUrl}/v1/policies`, { 
               headers, 
               signal: AbortSignal.timeout(10000) 
             });
@@ -1087,7 +1088,7 @@ export async function createApp(options: AppOptions) {
             const groupDetails = await Promise.allSettled(
               policyGroups.map(async (groupName: string) => {
                 try {
-                  const detailRes = await fetch(
+                  const detailRes = await gatewayFetch(
                     `${gatewayBaseUrl}/v1/policy_groups/select?group_name=${encodeURIComponent(groupName)}`,
                     { headers, signal: AbortSignal.timeout(5000) }
                   );
@@ -1153,7 +1154,7 @@ export async function createApp(options: AppOptions) {
         };
       } else {
         // Clash/OpenClash: direct proxy
-        const res = await fetch(`${gatewayBaseUrl}/providers/proxies`, { 
+        const res = await gatewayFetch(`${gatewayBaseUrl}/providers/proxies`, { 
           headers: { ...headers, 'Content-Type': 'application/json' }
         });
         if (!res.ok) {
@@ -1235,7 +1236,7 @@ export async function createApp(options: AppOptions) {
     try {
       if (isSurge) {
         // Surge uses /v1/rules endpoint
-        const res = await fetch(`${gatewayBaseUrl}/v1/rules`, { headers });
+        const res = await gatewayFetch(`${gatewayBaseUrl}/v1/rules`, { headers });
         if (!res.ok) {
           return reply.status(res.status).send({ error: `Surge API error: ${res.status}` });
         }
@@ -1262,7 +1263,7 @@ export async function createApp(options: AppOptions) {
         };
       } else {
         // Clash/OpenClash uses /rules endpoint
-        const res = await fetch(`${gatewayBaseUrl}/rules`, { 
+        const res = await gatewayFetch(`${gatewayBaseUrl}/rules`, { 
           headers: { ...headers, 'Content-Type': 'application/json' }
         });
         if (!res.ok) {

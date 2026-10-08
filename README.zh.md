@@ -409,6 +409,7 @@ curl -fsSL https://raw.githubusercontent.com/foru17/neko-master/main/setup.sh | 
 | `NEXT_PUBLIC_WS_PORT` | `3002` | WS 直连端口兜底值（**构建时注入，Docker 运行时设置无效**；Docker 场景请用 `WS_EXTERNAL_PORT`） | 仅源码自构建时需要自定义端口 |
 | `API_URL` | `http://localhost:3001` | Next.js `/api` rewrite 目标（主要用于源码/自构建） | 你修改了 API 实际监听地址时 |
 | `COOKIE_SECRET` | 自动生成 | Cookie 签名密钥；未固定时会自动生成（数据目录不持久化时重启后会话会失效） | 生产环境强烈建议固定配置 |
+| `BACKEND_TLS_INSECURE` | 空 | 设为 `1` 时仅对网关 API 跳过 TLS 证书校验（Surge `http-api-tls`、mihomo `external-controller-tls` 自签证书），启动时打印警告 | 网关走 HTTPS 且证书为自签 / 与 IP 不匹配时 |
 | `GEOIP_LOOKUP_PROVIDER` | `online` | IP 地理查询来源（`online`/`local`） | 需要默认走本地 MMDB 查询时 |
 | `GEOIP_ONLINE_API_URL` | `https://api.ipinfo.es/ipinfo` | 在线 IP 查询接口地址（需兼容 `ipinfo.my` 的响应结构） | 仅在你部署了兼容接口时设置 |
 | `FORCE_ACCESS_CONTROL_OFF` | `false` | 强制关闭访问控制（紧急恢复） | 仅忘记密码临时使用 |

@@ -418,6 +418,7 @@ The script will automatically detect and suggest available ports.
 | `NEXT_PUBLIC_WS_PORT` | `3002` | WS direct-connection fallback port (**build-time only — setting this at Docker runtime has no effect**; use `WS_EXTERNAL_PORT` instead) | Only for custom source builds |
 | `API_URL` | `http://localhost:3001` | Next.js `/api` rewrite target (mainly source/custom builds) | API listen address changed |
 | `COOKIE_SECRET` | auto-generated | Cookie signing secret; if not fixed, sessions can be invalidated after restart when data dir is not persisted | Strongly recommended in production |
+| `BACKEND_TLS_INSECURE` | empty | Set to `1` to skip TLS certificate verification for gateway APIs only (Surge `http-api-tls`, mihomo `external-controller-tls` with self-signed certs). Logs a warning at startup | Gateway uses HTTPS with a self-signed / IP-mismatched certificate |
 | `GEOIP_LOOKUP_PROVIDER` | `online` | IP geolocation source (`online` / `local`) | Default to local MMDB lookup |
 | `GEOIP_ONLINE_API_URL` | `https://api.ipinfo.es/ipinfo` | Online IP geolocation API endpoint (must be compatible with `ipinfo.my` response schema) | Set only when you deploy a compatible endpoint |
 | `FORCE_ACCESS_CONTROL_OFF` | `false` | Force disable access control (emergency recovery) | Temporary use only when token is lost |

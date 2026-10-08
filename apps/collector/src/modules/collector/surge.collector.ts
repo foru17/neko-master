@@ -7,6 +7,7 @@ import type { SurgeRequest, SurgeRequestsData } from "@neko-master/shared";
 import { calculateBackoffDelay } from "../../shared/utils/backoff.js";
 import { BatchBuffer } from "./batch-buffer.js";
 import { isPreexistingConnection } from "./connection-baseline.js";
+import { describeGatewayError, gatewayFetch } from "../../shared/utils/gateway-fetch.js";
 
 // Debug configuration
 const DEBUG_SURGE = process.env.DEBUG_SURGE === "true";
@@ -72,7 +73,7 @@ export class SurgeCollector {
       this.consecutiveErrors++;
       console.error(
         `[SurgeCollector:${this.backendId}] Poll error (${this.consecutiveErrors}/${this.MAX_RETRY_ATTEMPTS}):`,
-        error.message
+        describeGatewayError(error)
       );
       this.onError?.(error);
     }
@@ -133,7 +134,7 @@ export class SurgeCollector {
       headers["x-key"] = this.token;
     }
 
-    const response = await fetch(url, {
+    const response = await gatewayFetch(url, {
       headers,
       signal: AbortSignal.timeout(10000),
     });
