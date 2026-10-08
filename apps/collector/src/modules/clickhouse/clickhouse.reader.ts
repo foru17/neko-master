@@ -303,8 +303,12 @@ ORDER BY minute ASC
     tzOffsetMinutes = 0,
   ): Promise<Array<{ time: string; upload: number; download: number }> | null> {
     const safeBucket = Math.max(1, Math.floor(bucketMinutes));
-    const useLocalDay = safeBucket >= 1440 && tzOffsetMinutes !== 0;
-    const offsetSeconds = tzOffsetMinutes * 60;
+    // Interpolated into SQL below, so never trust the caller to have clamped it.
+    const safeOffset = Number.isFinite(tzOffsetMinutes)
+      ? Math.max(-840, Math.min(840, Math.trunc(tzOffsetMinutes)))
+      : 0;
+    const useLocalDay = safeBucket >= 1440 && safeOffset !== 0;
+    const offsetSeconds = safeOffset * 60;
     const bucketExpr = useLocalDay
       ? `toDateTime(toInt64(floor((toInt64(toUnixTimestamp(minute)) + (${offsetSeconds})) / 86400) * 86400 - (${offsetSeconds})), 'UTC')`
       : safeBucket <= 1
