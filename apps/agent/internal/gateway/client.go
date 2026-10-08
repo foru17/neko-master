@@ -279,7 +279,7 @@ func (c *Client) collectSurge(ctx context.Context) ([]domain.FlowSnapshot, error
 			ip = extractHost(remoteAddress)
 		}
 
-		sourceIP := extractHost(defaultString(strings.TrimSpace(reqItem.SourceAddress), strings.TrimSpace(reqItem.LocalAddress)))
+		sourceIP := surgeSourceIP(reqItem.SourceAddress, reqItem.LocalAddress)
 		chains := convertSurgeChains(reqItem.PolicyName, reqItem.OriginalPolicyName, []string(reqItem.Notes))
 		rule := defaultString(strings.TrimSpace(lastChain(chains)), defaultString(strings.TrimSpace(reqItem.OriginalPolicyName), "Match"))
 		rulePayload := strings.TrimSpace(reqItem.Rule)
@@ -383,6 +383,23 @@ func remoteAddressFirst(v string) string {
 		return ""
 	}
 	return strings.TrimSpace(parts[0])
+}
+
+// surgeSourceIP returns the device IP of a Surge request. sourceAddress is the
+// client that sent the request (issue #90); requests made by the Surge host
+// itself report a loopback source, so those fall back to localAddress to keep
+// attributing them to the host's LAN IP as before.
+func surgeSourceIP(sourceAddress, localAddress string) string {
+	source := extractHost(sourceAddress)
+	if source != "" {
+		if ip := net.ParseIP(source); !strings.EqualFold(source, "localhost") && (ip == nil || !ip.IsLoopback()) {
+			return source
+		}
+	}
+	if local := extractHost(localAddress); local != "" {
+		return local
+	}
+	return source
 }
 
 func extractHost(hostWithPort string) string {

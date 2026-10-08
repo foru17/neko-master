@@ -496,7 +496,7 @@ export function createSurgeCollector(
           : isIP(remoteAddress)
             ? remoteAddress
             : "";
-        const sourceIP = req.sourceAddress || req.localAddress || "";
+        const sourceIP = surgeSourceIP(req.sourceAddress, req.localAddress);
 
         // For Surge:
         // - policyName = final proxy (e.g., "🇺🇸 US-SJC-IEPL")
@@ -869,6 +869,23 @@ export function createSurgeCollector(
   };
 
   return collectorWithReset;
+}
+
+/**
+ * Device IP of a Surge request. `sourceAddress` is the client that sent the
+ * request (issue #90); requests made by the Surge host itself report a
+ * loopback source, so those fall back to `localAddress` to keep attributing
+ * them to the host's LAN IP as before.
+ */
+export function surgeSourceIP(sourceAddress?: string, localAddress?: string): string {
+  const source = extractHost((sourceAddress || "").trim());
+  if (source && !isLoopbackHost(source)) return source;
+  return extractHost((localAddress || "").trim()) || source;
+}
+
+function isLoopbackHost(host: string): boolean {
+  const h = host.toLowerCase();
+  return h === "::1" || h === "localhost" || /^(::ffff:)?127\./.test(h);
 }
 
 /**
