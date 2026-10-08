@@ -13,14 +13,14 @@ This release addresses bug and compatibility reports from GitHub issues.
 
 - **Huge traffic spike after upgrading/restarting** ([#50], thanks @PlutoNameless) 🐛
   - Gateways report cumulative bytes per connection. After a collector or agent restart (e.g. a container upgrade), the first snapshot counted the full history of every already-open long-lived connection again, adding tens of GB within minutes. Connections whose gateway start time (mihomo `start` / Surge `startDate`) is more than 5s before the process start now only establish a baseline, and later deltas are counted normally. Connections without a start time keep the old behavior, so no traffic is dropped. This applies to the direct mihomo collector, the Surge poller and the Go agent
-  - **Behavior change**: the pre-restart history of connections open at restart time is no longer counted (it was double counting), so the curve at upgrade time is lower than before
+  - **Behavior change**: the pre-restart history of connections open at restart time is no longer counted (it was double counting), so the curve at upgrade time is lower than before. Known limits: this relies on the gateway reporting connection start times with roughly synced clocks, and traffic of pre-existing connections during a gateway disconnect longer than 5 minutes is not counted
 - **Idle agents keep showing offline** ([#58], thanks @yf-9186) 🐛
   - The offline timeout default (30s) equaled the agent heartbeat interval (30s), agents skip reports when there is no traffic, and the backend list and manual test used an 8s window, so healthy idle agents showed offline most of the time. All checks now use the heartbeat timeout, which defaults to 90s (3 × the heartbeat interval) and can be set with `AGENT_HEARTBEAT_TIMEOUT_MS` (minimum 15000). **Behavior change**: an agent that really goes down is marked offline after up to 90s
 - **`fetch failed` when Surge `http-api-tls` is enabled** ([#88], thanks @fgprodigal) 🐛
   - Surge `http-api-tls` and mihomo `external-controller-tls` use self-signed certificates, so every gateway request failed with a bare `fetch failed`. Poll and test-connection errors now include the underlying cause (e.g. `DEPTH_ZERO_SELF_SIGNED_CERT`, `ECONNREFUSED`), with a hint for certificate errors
   - New `BACKEND_TLS_INSECURE=1` skips certificate verification for gateway APIs only, with a one-time startup warning. GeoIP, ClickHouse and other outbound requests still verify certificates. Use only on trusted networks
 - **Trend chart tooltip wrong for ranges over 24 hours** ([#82], thanks @pengbins) 🐛
-  - Fixed daily bucketing in the realtime merger and store, and raised the query bucket limit to 1440 minutes
+  - Fixed daily bucketing in the realtime merger and store, and raised the query bucket limit to 1440 minutes. Daily buckets follow UTC days; aligning them to the local day is tracked separately
 - **PWA forced to portrait on tablets** ([#73], thanks @ICEY16360): manifest `orientation` changed from `natural` to `any`
 
 ### Agent (shipped as `agent-v1.4.6`)

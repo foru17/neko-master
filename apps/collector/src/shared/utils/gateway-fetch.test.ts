@@ -44,6 +44,17 @@ describe("describeGatewayError", () => {
     expect(text).toContain("BACKEND_TLS_INSECURE");
   });
 
+  it("adds the TLS hint for ws errors that carry a top-level code", () => {
+    const err = Object.assign(new Error("self-signed certificate"), {
+      code: "DEPTH_ZERO_SELF_SIGNED_CERT",
+    });
+    const text = describeGatewayError(err);
+    expect(text).toContain("DEPTH_ZERO_SELF_SIGNED_CERT");
+    expect(text).toContain("BACKEND_TLS_INSECURE");
+    const refused = Object.assign(new Error("connect ECONNREFUSED"), { code: "ECONNREFUSED" });
+    expect(describeGatewayError(refused)).toBe("connect ECONNREFUSED");
+  });
+
   it("keeps plain errors unchanged", () => {
     expect(describeGatewayError(new Error("HTTP 500"))).toBe("HTTP 500");
     const refused = new TypeError("fetch failed", {

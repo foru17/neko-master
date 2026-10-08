@@ -45,6 +45,9 @@ export function gatewayFetch(
   }) as unknown as Promise<Response>;
 }
 
+const TLS_HINT =
+  " (gateway certificate not trusted; set BACKEND_TLS_INSECURE=1 to skip verification on trusted networks)";
+
 /**
  * Error text for a failed gateway request. Node's fetch throws a bare
  * "fetch failed" and hides the real reason (TLS, DNS, refused) in `cause`.
@@ -54,15 +57,20 @@ export function describeGatewayError(error: unknown): string {
   const cause = (error as Error & { cause?: unknown }).cause as
     | { code?: unknown; message?: unknown }
     | undefined;
-  const code = typeof cause?.code === "string" ? cause.code : "";
   const causeMessage = typeof cause?.message === "string" ? cause.message : "";
+  // ws reports TLS failures as a top-level error with `code` and no cause.
+  const topCode = (error as Error & { code?: unknown }).code;
+  if (!cause && typeof topCode === "string") {
+    return isTlsVerificationCode(topCode)
+      ? `${error.message} (${topCode})${TLS_HINT}`
+      : error.message;
+  }
+  const code = typeof cause?.code === "string" ? cause.code : "";
   if (!code && !causeMessage) return error.message;
   const detail = code && causeMessage
     ? causeMessage.includes(code) ? causeMessage : `${code}: ${causeMessage}`
     : code || causeMessage;
-  const hint = isTlsVerificationCode(code)
-    ? " (gateway certificate not trusted; set BACKEND_TLS_INSECURE=1 to skip verification on trusted networks)"
-    : "";
+  const hint = isTlsVerificationCode(code) ? TLS_HINT : "";
   return `${error.message} (${detail})${hint}`;
 }
 

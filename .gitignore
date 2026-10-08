@@ -66,3 +66,6 @@ next-env.d.ts
 .claude/*
 !.claude/skills/
 .refactoring_docs/
+
+# Local Go agent build output
+apps/agent/agent
