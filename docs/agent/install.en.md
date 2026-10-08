@@ -40,6 +40,8 @@ Optional env:
 - `NEKO_BIN_LINK_MODE`: `auto|true|false` for symlink into global bin dir (default `auto`)
 - `NEKO_LINK_DIR`: global bin dir for symlink (default `/usr/local/bin`)
 
+Set `AGENT_HEARTBEAT_TIMEOUT_MS` in the collector process environment to adjust the agent heartbeat timeout for automatic health checks (milliseconds, default `90000`, minimum `15000`). The default allows 3 × the agent's default 30-second heartbeat interval to tolerate delayed reports; this is a collector setting, not an agent install option.
+
 After install, manage agent with:
 
 ```bash

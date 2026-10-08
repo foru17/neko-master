@@ -568,7 +568,7 @@ export class BackendService {
   private getAgentHeartbeatTimeoutMs(): number {
     return Math.max(
       15_000,
-      Number.parseInt(process.env.AGENT_HEARTBEAT_TIMEOUT_MS || '30000', 10) || 30_000,
+      Number.parseInt(process.env.AGENT_HEARTBEAT_TIMEOUT_MS || '90000', 10) || 90_000,
     );
   }
 

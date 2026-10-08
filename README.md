@@ -428,6 +428,7 @@ The script will automatically detect and suggest available ports.
 
 | Variable | Default | Description |
 | :-- | :-- | :-- |
+| `AGENT_HEARTBEAT_TIMEOUT_MS` | `90000` | Collector-side agent heartbeat timeout for automatic health checks in milliseconds (minimum `15000`); defaults to 3 × the agent's 30s heartbeat interval to tolerate delayed reports |
 | `FLUSH_INTERVAL_MS` | `30000` | Buffer flush interval for collector writes |
 | `FLUSH_MAX_BUFFER_SIZE` | `5000` | Max buffer entries before early flush |
 | `REALTIME_MAX_MINUTES` | `180` | Realtime in-memory window size (minutes) |
