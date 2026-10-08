@@ -225,6 +225,7 @@ INSTANCE=backend-1   # change as needed
 CONF=/etc/neko-agent/${INSTANCE}.env
 
 start_service() {
+    mkdir -p /var/run/neko-agent
     # load config
     [ -f "$CONF" ] && . "$CONF"
     procd_open_instance
@@ -239,6 +240,7 @@ start_service() {
     procd_set_param respawn 3600 5 5
     procd_set_param stdout 1
     procd_set_param stderr 1
+    procd_set_param pidfile "/var/run/neko-agent/${INSTANCE}.pid"
     procd_close_instance
 }
 ```
