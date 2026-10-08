@@ -418,6 +418,7 @@ The script will automatically detect and suggest available ports.
 | `NEXT_PUBLIC_WS_PORT` | `3002` | WS direct-connection fallback port (**build-time only — setting this at Docker runtime has no effect**; use `WS_EXTERNAL_PORT` instead) | Only for custom source builds |
 | `API_URL` | `http://localhost:3001` | Next.js `/api` rewrite target (mainly source/custom builds) | API listen address changed |
 | `COOKIE_SECRET` | auto-generated | Cookie signing secret; if not fixed, sessions can be invalidated after restart when data dir is not persisted | Strongly recommended in production |
+| `AGENT_HEARTBEAT_TIMEOUT_MS` | `90000` | How long (ms, minimum `15000`) an agent may go without a heartbeat/report before it is shown offline (backend list, health checks, manual test). Defaults to 3 × the agent's 30s heartbeat interval | Agents flap online/offline on slow links |
 | `BACKEND_TLS_INSECURE` | empty | Set to `1` to skip TLS certificate verification for gateway APIs only (Surge `http-api-tls`, mihomo `external-controller-tls` with self-signed certs). Logs a warning at startup | Gateway uses HTTPS with a self-signed / IP-mismatched certificate |
 | `GEOIP_LOOKUP_PROVIDER` | `online` | IP geolocation source (`online` / `local`) | Default to local MMDB lookup |
 | `GEOIP_ONLINE_API_URL` | `https://api.ipinfo.es/ipinfo` | Online IP geolocation API endpoint (must be compatible with `ipinfo.my` response schema) | Set only when you deploy a compatible endpoint |
@@ -428,7 +429,6 @@ The script will automatically detect and suggest available ports.
 
 | Variable | Default | Description |
 | :-- | :-- | :-- |
-| `AGENT_HEARTBEAT_TIMEOUT_MS` | `90000` | Collector-side agent heartbeat timeout for automatic health checks in milliseconds (minimum `15000`); defaults to 3 × the agent's 30s heartbeat interval to tolerate delayed reports |
 | `FLUSH_INTERVAL_MS` | `30000` | Buffer flush interval for collector writes |
 | `FLUSH_MAX_BUFFER_SIZE` | `5000` | Max buffer entries before early flush |
 | `REALTIME_MAX_MINUTES` | `180` | Realtime in-memory window size (minutes) |

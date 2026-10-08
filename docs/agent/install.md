@@ -40,7 +40,7 @@ curl -fsSL https://raw.githubusercontent.com/foru17/neko-master/main/apps/agent/
 - `NEKO_BIN_LINK_MODE`：全局 bin 目录软链模式（`auto|true|false`，默认 `auto`）
 - `NEKO_LINK_DIR`：软链目标目录（默认 `/usr/local/bin`）
 
-采集器端可设置 `AGENT_HEARTBEAT_TIMEOUT_MS` 调整 Agent 自动健康检查的心跳超时（毫秒，默认 `90000`，最小 `15000`）。默认值为 Agent 默认 30 秒心跳间隔的 3 倍，用于容忍上报延迟；此变量应配置在采集器进程的环境中，而非 Agent 安装命令中。
+采集器端可设置 `AGENT_HEARTBEAT_TIMEOUT_MS` 调整 Agent 判定离线的心跳超时（后端列表、自动健康检查与手动测试共用）（毫秒，默认 `90000`，最小 `15000`）。默认值为 Agent 默认 30 秒心跳间隔的 3 倍，用于容忍上报延迟；此变量应配置在采集器进程的环境中，而非 Agent 安装命令中。
 
 安装完成后，使用以下命令管理 Agent：
 

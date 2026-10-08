@@ -47,4 +47,32 @@ describe('BackendService agent heartbeat health checks', () => {
 
     expect(service.getHealthStatus(backendId)?.status).toBe(expected);
   });
+
+  // Issue #58: an idle agent refreshes lastSeen only via its 30s heartbeat.
+  // The backend list badge and the manual test must not use a shorter window.
+  it('keeps an idle agent healthy in the backend list and manual test', async () => {
+    db.upsertAgentHeartbeat({
+      backendId,
+      agentId: 'test-agent',
+      lastSeen: new Date(Date.now() - 25_000).toISOString(),
+    });
+
+    const listed = service.getAllBackends().find((b) => b.id === backendId);
+    expect(listed?.health?.status).toBe('healthy');
+
+    const manual = await service.testExistingBackendConnection(backendId);
+    expect(manual.success).toBe(true);
+  });
+
+  it('still honours an explicit AGENT_MANUAL_TEST_TIMEOUT_MS', async () => {
+    vi.stubEnv('AGENT_MANUAL_TEST_TIMEOUT_MS', '8000');
+    db.upsertAgentHeartbeat({
+      backendId,
+      agentId: 'test-agent',
+      lastSeen: new Date(Date.now() - 25_000).toISOString(),
+    });
+
+    const manual = await service.testExistingBackendConnection(backendId);
+    expect(manual.success).toBe(false);
+  });
 });

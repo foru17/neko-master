@@ -211,11 +211,9 @@ export class BackendService {
    */
   private attachHealthStatus(backend: BackendResponse): BackendResponse {
     if (isAgentBackendUrl(backend.url)) {
-      const dynamicHealth = this.buildAgentHealthStatus(
-        backend.id,
-        Date.now(),
-        this.getAgentManualTestTimeoutMs(),
-      );
+      // Idle agents only refresh lastSeen via the periodic heartbeat, so the
+      // list badge must use the heartbeat timeout (issue #58).
+      const dynamicHealth = this.buildAgentHealthStatus(backend.id, Date.now());
       this.healthStatus.set(backend.id, dynamicHealth);
       return { ...backend, health: dynamicHealth };
     }
@@ -573,10 +571,13 @@ export class BackendService {
   }
 
   private getAgentManualTestTimeoutMs(): number {
-    return Math.max(
-      3_000,
-      Number.parseInt(process.env.AGENT_MANUAL_TEST_TIMEOUT_MS || '8000', 10) || 8_000,
-    );
+    // An idle agent only sends a heartbeat every 30s, so a shorter window
+    // reports healthy agents as offline (issue #58). Default to the heartbeat
+    // timeout unless explicitly overridden.
+    const override = Number.parseInt(process.env.AGENT_MANUAL_TEST_TIMEOUT_MS || '', 10);
+    return Number.isFinite(override) && override > 0
+      ? Math.max(3_000, override)
+      : this.getAgentHeartbeatTimeoutMs();
   }
 
   private buildAgentHealthStatus(
