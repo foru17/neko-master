@@ -6,6 +6,7 @@ import { realtimeStore } from "../realtime/realtime.store.js";
 import type { SurgeRequest, SurgeRequestsData } from "@neko-master/shared";
 import { calculateBackoffDelay } from "../../shared/utils/backoff.js";
 import { BatchBuffer } from "./batch-buffer.js";
+import { isPreexistingConnection } from "./connection-baseline.js";
 
 // Debug configuration
 const DEBUG_SURGE = process.env.DEBUG_SURGE === "true";
@@ -249,6 +250,7 @@ export function createSurgeCollector(
   const id = backendId || 0;
   const activeRequests = new Map<string, TrackedRequest>();
   const batchBuffer = new BatchBuffer();
+  const startedAt = Date.now();
 
   // Track recently completed requests to prevent double counting
   // Key: request ID, Value: completion timestamp
@@ -450,6 +452,7 @@ export function createSurgeCollector(
         data.requests.map((r) => r?.id).filter(Boolean)
       );
       let hasNewTraffic = false;
+      let baselinedRequests = 0;
       const geoBatchByIp = new Map<
         string,
         { upload: number; download: number; connections: number }
@@ -546,7 +549,13 @@ export function createSurgeCollector(
           // IMPORTANT: We now record initial traffic immediately to prevent data loss
           // for short-lived connections that disappear before the next poll.
           // The recentlyCompleted map prevents double counting if the same request reappears.
-          const hasInitialTraffic = currentUpload > 0 || currentDownload > 0;
+          // Requests that started before this collector (including completed
+          // ones still listed in /v1/requests/recent) only set a baseline:
+          // their cumulative bytes predate us (issue #50).
+          const preexisting = isPreexistingConnection(req.startDate, startedAt);
+          const hasInitialTraffic =
+            !preexisting && (currentUpload > 0 || currentDownload > 0);
+          if (preexisting) baselinedRequests++;
           activeRequests.set(req.id, {
             id: req.id,
             domain,
@@ -564,7 +573,7 @@ export function createSurgeCollector(
             completed: isCompleted,
             disconnected: isDisconnected,
             lastStatus: req.status,
-            counted: hasInitialTraffic,
+            counted: hasInitialTraffic || preexisting,
             initialProcessed: true,  // Mark as processed
           });
 
@@ -723,6 +732,12 @@ export function createSurgeCollector(
             });
           }
         }
+      }
+
+      if (baselinedRequests > 0) {
+        console.info(
+          `[SurgeCollector:${id}] Baselined ${baselinedRequests} request(s) started before collector start; prior cumulative traffic not counted`,
+        );
       }
 
       // Clean up completed/disappeared connections

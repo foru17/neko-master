@@ -88,7 +88,14 @@ type Runner struct {
 	lastPolicyHash   string
 	gatewayLatencyMs int64
 	serverLatencyMs  int64
+
+	// startedAtMs marks when this agent began watching. Flows the gateway
+	// opened before it only establish a baseline (issue #50).
+	startedAtMs int64
 }
+
+// preexistingFlowGraceMs absorbs clock skew between gateway and agent.
+const preexistingFlowGraceMs = 5_000
 
 func NewRunner(cfg config.Config) *Runner {
 	httpClient := &http.Client{Timeout: cfg.RequestTimeout}
@@ -104,6 +111,7 @@ func NewRunner(cfg config.Config) *Runner {
 		hostname:      hostname,
 		queue:         make([]domain.TrafficUpdate, 0, cfg.ReportBatchSize*2),
 		flows:         make(map[string]trackedFlow, 2048),
+		startedAtMs:   time.Now().UnixMilli(),
 	}
 }
 
@@ -479,7 +487,14 @@ func (r *Runner) ingestSnapshots(snapshots []domain.FlowSnapshot, nowMs int64) {
 
 		deltaUp := s.Upload
 		deltaDown := s.Download
-		if hasPrev {
+		if !hasPrev && s.StartMs > 0 && s.StartMs < r.startedAtMs-preexistingFlowGraceMs {
+			// Opened before this agent started: the cumulative counters include
+			// traffic from before we were watching (likely already reported by
+			// the previous process). Baseline only; later deltas count normally.
+			deltaUp = 0
+			deltaDown = 0
+			counted = true
+		} else if hasPrev {
 			if s.Upload < prev.LastUpload || s.Download < prev.LastDown {
 				// Counter reset (gateway restart / connection id reuse): the
 				// counter went backwards. Match the direct gateway collector and

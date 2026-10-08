@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net"
 	"net/http"
 	"regexp"
@@ -46,6 +47,7 @@ func (c *Client) Collect(ctx context.Context) ([]domain.FlowSnapshot, error) {
 type clashConnectionsResponse struct {
 	Connections []struct {
 		ID          string   `json:"id"`
+		Start       string   `json:"start"`
 		Upload      float64  `json:"upload"`
 		Download    float64  `json:"download"`
 		Rule        string   `json:"rule"`
@@ -164,6 +166,7 @@ type surgeRequestsResponse struct {
 		OutBytes           flexibleFloat64    `json:"outBytes"`
 		InBytes            flexibleFloat64    `json:"inBytes"`
 		Time               flexibleFloat64    `json:"time"`
+		StartDate          flexibleFloat64    `json:"startDate"`
 	} `json:"requests"`
 }
 
@@ -215,6 +218,7 @@ func (c *Client) collectClash(ctx context.Context) ([]domain.FlowSnapshot, error
 			Upload:      toInt64(item.Upload),
 			Download:    toInt64(item.Download),
 			TimestampMs: nowMs,
+			StartMs:     parseClashStart(item.Start),
 		})
 	}
 
@@ -296,10 +300,36 @@ func (c *Client) collectSurge(ctx context.Context) ([]domain.FlowSnapshot, error
 			Upload:      toInt64(float64(reqItem.OutBytes)),
 			Download:    toInt64(float64(reqItem.InBytes)),
 			TimestampMs: timestampMs,
+			StartMs:     epochToMs(float64(reqItem.StartDate)),
 		})
 	}
 
 	return snapshots, nil
+}
+
+// parseClashStart converts mihomo's RFC 3339 connection start time to epoch
+// ms, returning 0 when missing or unparseable.
+func parseClashStart(value string) int64 {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return 0
+	}
+	t, err := time.Parse(time.RFC3339Nano, value)
+	if err != nil {
+		return 0
+	}
+	return t.UnixMilli()
+}
+
+// epochToMs accepts epoch seconds (Surge startDate) or milliseconds.
+func epochToMs(value float64) int64 {
+	if value <= 0 || math.IsNaN(value) || math.IsInf(value, 0) {
+		return 0
+	}
+	if value < 1e12 {
+		return toInt64(value * 1000)
+	}
+	return toInt64(value)
 }
 
 func normalizeChains(chains []string) []string {

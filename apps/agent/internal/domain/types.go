@@ -25,4 +25,7 @@ type FlowSnapshot struct {
 	Upload      int64
 	Download    int64
 	TimestampMs int64
+	// StartMs is when the gateway opened the connection (epoch ms, 0 when the
+	// gateway did not report it). Internal only; never sent to the server.
+	StartMs int64
 }

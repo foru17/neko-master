@@ -134,3 +134,51 @@ func TestIngestSnapshotsFirstTrafficAfterZeroCarriesConnection(t *testing.T) {
 		t.Fatalf("expected connections 1 for first non-zero traffic, got %d", second[0].Connections)
 	}
 }
+
+func TestIngestSnapshotsBaselinesFlowsOpenedBeforeStart(t *testing.T) {
+	runner := NewRunner(config.Config{
+		ServerAPIBase:       "http://localhost:3000/api",
+		BackendID:           1,
+		BackendToken:        "token",
+		AgentID:             "agent-test",
+		GatewayType:         "clash",
+		GatewayEndpoint:     "http://127.0.0.1:9090",
+		ReportInterval:      time.Second,
+		HeartbeatInterval:   time.Second,
+		GatewayPollInterval: time.Second,
+		RequestTimeout:      time.Second,
+		ReportBatchSize:     100,
+		MaxPendingUpdates:   1000,
+		StaleFlowTimeout:    time.Minute,
+	})
+	started := runner.startedAtMs
+
+	// Issue #50: after a restart the first snapshot still carries the full
+	// cumulative counters of long-lived connections.
+	runner.ingestSnapshots([]domain.FlowSnapshot{
+		{ID: "old", Upload: 17_000_000_000, Download: 1, StartMs: started - 3_600_000, Chains: []string{"Proxy"}},
+		{ID: "new", Upload: 300, Download: 400, StartMs: started + 1_000, Chains: []string{"Proxy"}},
+		{ID: "unknown-start", Upload: 7, Download: 8, Chains: []string{"Proxy"}},
+	}, started+2_000)
+
+	first := runner.takeBatch(10)
+	var total int64
+	for _, u := range first {
+		total += u.Upload + u.Download
+	}
+	if len(first) != 2 || total != 300+400+7+8 {
+		t.Fatalf("expected only new and unknown-start flows counted (715 bytes in 2 updates), got %d updates / %d bytes", len(first), total)
+	}
+
+	runner.ingestSnapshots([]domain.FlowSnapshot{
+		{ID: "old", Upload: 17_000_001_000, Download: 1, StartMs: started - 3_600_000, Chains: []string{"Proxy"}},
+	}, started+3_000)
+
+	second := runner.takeBatch(10)
+	if len(second) != 1 || second[0].Upload != 1000 || second[0].Download != 0 {
+		t.Fatalf("expected baseline flow delta 1000/0, got %+v", second)
+	}
+	if second[0].Connections != 0 {
+		t.Fatalf("expected baselined flow not re-counted as a connection, got %d", second[0].Connections)
+	}
+}

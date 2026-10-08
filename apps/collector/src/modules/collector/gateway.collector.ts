@@ -6,6 +6,7 @@ import { TrafficWriteError } from "../clickhouse/clickhouse.writer.js";
 import { realtimeStore } from "../realtime/realtime.store.js";
 import { calculateBackoffDelay } from "../../shared/utils/backoff.js";
 import { BatchBuffer } from "./batch-buffer.js";
+import { isPreexistingConnection } from "./connection-baseline.js";
 
 // Stale connection cleanup constants
 const STALE_CONNECTION_TIMEOUT = 5 * 60 * 1000; // 5 minutes
@@ -228,6 +229,7 @@ export function createCollector(
 ) {
   const id = backendId || 0;
   const activeConnections = new Map<string, TrackedConnection>();
+  const startedAt = Date.now();
   const batchBuffer = new BatchBuffer();
   let lastBroadcastTime = 0;
   const broadcastThrottleMs = 500;
@@ -416,6 +418,7 @@ export function createCollector(
       );
       let hasNewTraffic = false;
       let counterResets = 0;
+      let baselinedConnections = 0;
       const geoBatchByIp = new Map<
         string,
         { upload: number; download: number; connections: number }
@@ -445,8 +448,13 @@ export function createCollector(
         const existing = activeConnections.get(conn.id);
 
         if (!existing) {
-          // New connection - track it and record initial traffic
-          const hasInitialTraffic = conn.upload > 0 || conn.download > 0;
+          // New connection - track it and record initial traffic. Connections
+          // opened before this collector started only set a baseline: their
+          // cumulative counters predate us (issue #50).
+          const preexisting = isPreexistingConnection(conn.start, startedAt);
+          const hasInitialTraffic =
+            !preexisting && (conn.upload > 0 || conn.download > 0);
+          if (preexisting) baselinedConnections++;
           activeConnections.set(conn.id, {
             id: conn.id,
             domain,
@@ -458,7 +466,9 @@ export function createCollector(
             lastDownload: conn.download,
             totalUpload: conn.upload,
             totalDownload: conn.download,
-            counted: hasInitialTraffic,
+            // A preexisting connection was already counted by whoever was
+            // watching before us.
+            counted: hasInitialTraffic || preexisting,
             sourceIP,
             lastSeen: now,
           });
@@ -590,6 +600,12 @@ export function createCollector(
             hasNewTraffic = true;
           }
         }
+      }
+
+      if (baselinedConnections > 0) {
+        console.info(
+          `[Collector:${id}] Baselined ${baselinedConnections} connection(s) opened before collector start; prior cumulative traffic not counted`,
+        );
       }
 
       if (counterResets > 0) {
