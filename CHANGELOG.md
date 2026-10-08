@@ -5,6 +5,34 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/spec/v2.0.0.html)。
 
+## [1.4.2] - 2026-10-09
+
+本版本合入社区提交的 bug 修复 PR，并补完 #82 的时区问题。感谢 @MaxwellChang98、@yafeishi、@heroixinu、@GodD6366。
+
+### 修复
+
+- **设备/域名等列表的地区信息错位**（PR [#81]，感谢 @MaxwellChang98）🐛
+  - GeoIP 数组按位置存放（国家、国家名、城市、ASN 组织），城市为空时被 `filter(Boolean)` 过滤掉，ASN 组织就挤到了城市的位置。现在保留空位；PR 漏掉的规则与代理列表 3 处解析也一并修复，并加了回归测试
+- **Stash 网关流量一直为 0**（PR [#97]，感谢 @yafeishi）🐛
+  - Stash 把每条连接的上传/下载报成 `{ total, current, max }` 对象，连接 ID 是数字。现在在接收数据时统一转成累计字节数和字符串 ID，mihomo/Clash 不受影响
+- **登录后实时推送断开（WebSocket 4003）**（PR [#92]，感谢 @heroixinu）🐛
+  - 会话 cookie 写入时会做 URL 编码，WebSocket 服务端自己解析 cookie 时却没有解码，还会在 token 内的 `=` 处截断，token 含 `+`、`/`、`=` 时鉴权失败。现在只按第一个 `=` 切分并解码；鉴权服务同时兼容编码过的 token
+- **Surge 网关下所有设备都显示成网关自己的 IP**（PR [#90]，感谢 @GodD6366）🐛
+  - 设备 IP 改用 Surge 的 `sourceAddress`（发起请求的客户端），不再用 `localAddress`（网关本机地址）。Surge 主机自身发出的请求 `sourceAddress` 是回环地址，这类请求仍记在主机的局域网 IP 上
+  - **行为变化**：Surge 用户局域网内的设备会按真实 IP 分开统计；升级前记在网关 IP 上的历史数据不迁移
+- **趋势图日桶按本地日划分**（[#82] 残留）🐛
+  - 按天查看趋势时，前端会把浏览器时区偏移传给服务端，SQLite、ClickHouse 与实时数据都按查看者的本地日分桶，不再按 UTC 日（此前东八区每个日桶偏 8 小时）。不传偏移的旧调用方行为不变。非整小时时区（如 +5:30）的日界线在 SQLite 下仍按整小时对齐
+
+### Agent（随 `agent-v1.4.7` 发布）
+
+- Surge 设备 IP 改用 `sourceAddress`，规则与上面一致（PR [#90]）。上报协议版本不变
+
+[#81]: https://github.com/foru17/neko-master/pull/81
+[#82]: https://github.com/foru17/neko-master/issues/82
+[#90]: https://github.com/foru17/neko-master/pull/90
+[#92]: https://github.com/foru17/neko-master/pull/92
+[#97]: https://github.com/foru17/neko-master/pull/97
+
 ## [1.4.1] - 2026-10-09
 
 本版本集中处理 GitHub 上反馈的 bug 与兼容问题。

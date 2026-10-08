@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.2] - 2026-10-09
+
+This release merges community bug-fix PRs and finishes the timezone part of #82. Thanks to @MaxwellChang98, @yafeishi, @heroixinu and @GodD6366.
+
+### Fixed
+
+- **Region details shifted in device, domain and other lists** (PR [#81], thanks @MaxwellChang98) 🐛
+  - GeoIP arrays are positional (country, country name, city, ASN organization). `filter(Boolean)` dropped an empty city, which moved the ASN organization into the city slot. Empty slots are now kept. Three parsers the PR missed (rule and proxy lists) are fixed too, with a regression test
+- **Stash gateway shows zero traffic** (PR [#97], thanks @yafeishi) 🐛
+  - Stash reports per-connection upload/download as `{ total, current, max }` objects and uses numeric connection IDs. They are now normalized to cumulative byte counts and string IDs at ingestion. mihomo/Clash are unaffected
+- **Live updates drop after login (WebSocket 4003)** (PR [#92], thanks @heroixinu) 🐛
+  - The session cookie is URL-encoded when set, but the WebSocket server parsed cookies itself without decoding and also cut the token at any `=` inside it, so tokens containing `+`, `/` or `=` failed authentication. It now splits on the first `=` only and decodes the value; the auth service also accepts encoded tokens
+- **Every device shows the Surge gateway's own IP** (PR [#90], thanks @GodD6366) 🐛
+  - The device IP now comes from Surge's `sourceAddress` (the client that sent the request) instead of `localAddress` (the gateway's own address). Requests made by the Surge host itself report a loopback `sourceAddress` and stay attributed to the host's LAN IP
+  - **Behavior change**: LAN devices behind Surge are now counted by their real IPs. History recorded under the gateway IP before the upgrade is not migrated
+- **Daily trend buckets follow the local day** ([#82] follow-up) 🐛
+  - For daily trends the web sends the browser's timezone offset, and SQLite, ClickHouse and realtime data are bucketed by the viewer's local day instead of the UTC day (UTC+8 buckets were shifted by 8 hours). Callers that don't send an offset are unchanged. For non-whole-hour offsets (e.g. +5:30), SQLite still aligns day boundaries to whole hours
+
+### Agent (shipped as `agent-v1.4.7`)
+
+- Surge device IP now comes from `sourceAddress`, with the same rules as above (PR [#90]). The report protocol version is unchanged
+
+[#81]: https://github.com/foru17/neko-master/pull/81
+[#82]: https://github.com/foru17/neko-master/issues/82
+[#90]: https://github.com/foru17/neko-master/pull/90
+[#92]: https://github.com/foru17/neko-master/pull/92
+[#97]: https://github.com/foru17/neko-master/pull/97
+
 ## [1.4.1] - 2026-10-09
 
 This release addresses bug and compatibility reports from GitHub issues.
