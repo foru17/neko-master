@@ -574,7 +574,10 @@ export function createSurgeCollector(
             completed: isCompleted,
             disconnected: isDisconnected,
             lastStatus: req.status,
-            counted: hasInitialTraffic || preexisting,
+            // Preexisting requests with bytes were counted before the restart.
+            counted:
+              hasInitialTraffic ||
+              (preexisting && (currentUpload > 0 || currentDownload > 0)),
             initialProcessed: true,  // Mark as processed
           });
 

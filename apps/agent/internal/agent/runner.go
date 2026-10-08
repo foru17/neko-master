@@ -491,9 +491,11 @@ func (r *Runner) ingestSnapshots(snapshots []domain.FlowSnapshot, nowMs int64) {
 			// Opened before this agent started: the cumulative counters include
 			// traffic from before we were watching (likely already reported by
 			// the previous process). Baseline only; later deltas count normally.
+			// Only a flow that already moved bytes was counted as a connection
+			// before; an idle one still counts once it first moves traffic.
+			counted = s.Upload > 0 || s.Download > 0
 			deltaUp = 0
 			deltaDown = 0
-			counted = true
 		} else if hasPrev {
 			if s.Upload < prev.LastUpload || s.Download < prev.LastDown {
 				// Counter reset (gateway restart / connection id reuse): the

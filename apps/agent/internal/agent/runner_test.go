@@ -159,6 +159,7 @@ func TestIngestSnapshotsBaselinesFlowsOpenedBeforeStart(t *testing.T) {
 		{ID: "old", Upload: 17_000_000_000, Download: 1, StartMs: started - 3_600_000, Chains: []string{"Proxy"}},
 		{ID: "new", Upload: 300, Download: 400, StartMs: started + 1_000, Chains: []string{"Proxy"}},
 		{ID: "unknown-start", Upload: 7, Download: 8, Chains: []string{"Proxy"}},
+		{ID: "idle", Upload: 0, Download: 0, StartMs: started - 3_600_000, Chains: []string{"Idle"}},
 	}, started+2_000)
 
 	first := runner.takeBatch(10)
@@ -180,5 +181,15 @@ func TestIngestSnapshotsBaselinesFlowsOpenedBeforeStart(t *testing.T) {
 	}
 	if second[0].Connections != 0 {
 		t.Fatalf("expected baselined flow not re-counted as a connection, got %d", second[0].Connections)
+	}
+
+	// An idle preexisting flow was never counted, so its first bytes add one
+	// connection.
+	runner.ingestSnapshots([]domain.FlowSnapshot{
+		{ID: "idle", Upload: 50, Download: 0, StartMs: started - 3_600_000, Chains: []string{"Idle"}},
+	}, started+4_000)
+	third := runner.takeBatch(10)
+	if len(third) != 1 || third[0].Upload != 50 || third[0].Connections != 1 {
+		t.Fatalf("expected idle baselined flow to count 50 bytes and 1 connection, got %+v", third)
 	}
 }

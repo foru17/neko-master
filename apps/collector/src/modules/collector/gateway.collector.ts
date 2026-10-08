@@ -468,9 +468,12 @@ export function createCollector(
             lastDownload: conn.download,
             totalUpload: conn.upload,
             totalDownload: conn.download,
-            // A preexisting connection was already counted by whoever was
-            // watching before us.
-            counted: hasInitialTraffic || preexisting,
+            // A preexisting connection that already moved bytes was counted by
+            // whoever watched it before us; an idle one still counts once it
+            // first moves traffic.
+            counted:
+              hasInitialTraffic ||
+              (preexisting && (conn.upload > 0 || conn.download > 0)),
             sourceIP,
             lastSeen: now,
           });

@@ -5,6 +5,11 @@
 // recorded by the previous process. Counting them as fresh traffic produces a
 // huge spike at restart (issue #50). Such connections only establish a
 // baseline; later deltas are counted normally.
+//
+// This is a mitigation with known limits: it relies on the gateway reporting a
+// start time and on gateway/collector clocks being roughly in sync. Bytes a
+// preexisting connection moves between collector start and the first snapshot
+// are not counted.
 
 // Allow for clock skew between the gateway and the collector host.
 export const PREEXISTING_GRACE_MS = 5_000;
@@ -28,9 +33,9 @@ export function parseConnectionStartMs(value: unknown): number | null {
 }
 
 /**
- * True when the connection demonstrably started before the collector began
- * watching. Unknown start times return false so traffic is never dropped on
- * backends that omit the field.
+ * True when the connection started before the collector began watching.
+ * Unknown start times return false, keeping the previous behavior (count the
+ * first snapshot) for backends that omit the field.
  */
 export function isPreexistingConnection(
   startValue: unknown,

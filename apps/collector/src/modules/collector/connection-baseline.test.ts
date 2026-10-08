@@ -110,6 +110,7 @@ describe("gateway collector restart baseline (issue #50)", () => {
       JSON.stringify({
         connections: [
           conn("old", oldStart, 17e9, 17e9),
+          conn("idle", oldStart, 0, 0),
           conn("new", newStart, 300, 400),
         ],
       }),
@@ -126,15 +127,21 @@ describe("gateway collector restart baseline (issue #50)", () => {
       JSON.stringify({
         connections: [
           conn("old", oldStart, 17e9 + 1000, 17e9),
+          conn("idle", oldStart, 50, 0),
           conn("new", newStart, 300, 400),
         ],
       }),
     );
-    await vi.waitFor(() => expect(recordedBytes(spy, backendId)).toHaveLength(2), {
+    await vi.waitFor(() => expect(recordedBytes(spy, backendId)).toHaveLength(3), {
       timeout: 2000,
       interval: 20,
     });
-    expect(recordedBytes(spy, backendId)[1]).toEqual({ up: 1000, down: 0, conns: 0 });
+    expect(recordedBytes(spy, backendId).slice(1)).toEqual([
+      { up: 1000, down: 0, conns: 0 },
+      // An idle preexisting connection was never counted, so its first bytes
+      // still add one connection.
+      { up: 50, down: 0, conns: 1 },
+    ]);
   });
 });
 
@@ -180,6 +187,8 @@ describe("surge collector restart baseline (issue #50)", () => {
           JSON.stringify({
             requests: [
               request("old", nowSec - 3600, oldBytes, 0),
+              // Completed before the restart but still in the recent list.
+              { ...request("done", nowSec - 600, 9e9, 9e9), completed: true },
               request("new", nowSec + 1, 300, 400),
             ],
           }),
