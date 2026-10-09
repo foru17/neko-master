@@ -297,7 +297,7 @@ main() {
 
 		# Determine target plain version (strip "agent-v" prefix)
 		if [ "$NEKO_AGENT_VERSION" = "latest" ]; then
-			resolved_tag="$(get_latest_remote_tag "$NEKO_AGENT_REPO")"
+			resolved_tag="$(get_latest_remote_tag "$NEKO_AGENT_REPO")" || resolved_tag=""
 			remote_tag="$resolved_tag"
 			target_version="${remote_tag#agent-v}"
 		else
@@ -327,7 +327,9 @@ main() {
 		# Resolve "latest" to a concrete agent-v* tag. releases/latest/download is
 		# unsafe here: it points at whatever release GitHub marks latest, which may
 		# be a main-app v* release with no agent binaries (→ 404).
-		resolved_tag="${resolved_tag:-$(get_latest_remote_tag "$NEKO_AGENT_REPO")}"
+		if [ -z "${resolved_tag:-}" ]; then
+			resolved_tag="$(get_latest_remote_tag "$NEKO_AGENT_REPO")" || resolved_tag=""
+		fi
 		if [ -z "$resolved_tag" ]; then
 			echo "[neko-agent] error: could not determine latest agent version from GitHub API" >&2
 			echo "[neko-agent] hint: check network access or pin a version: NEKO_AGENT_VERSION=agent-vX.Y.Z" >&2

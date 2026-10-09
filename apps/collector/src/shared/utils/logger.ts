@@ -20,7 +20,9 @@ export function applyLogLevel(level = process.env.LOG_LEVEL): void {
     console[method] = original;
   }
 
-  let threshold = levels.indexOf((level ?? 'info').toLowerCase());
+  // An empty value (e.g. `LOG_LEVEL=` in .env) means unset.
+  const normalized = (level ?? '').trim().toLowerCase() || 'info';
+  let threshold = levels.indexOf(normalized);
   if (threshold === -1) {
     console.warn(`[Logger] Unknown LOG_LEVEL=${level}, falling back to info`);
     threshold = levels.indexOf('info');

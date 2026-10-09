@@ -615,7 +615,7 @@ do_download_binary() {
   if [ "$version_arg" = "latest" ]; then
     # Resolve to a concrete agent-v* tag; releases/latest may be a main-app
     # release with no agent binaries (→ 404).
-    tag="$(get_latest_remote_tag "$AGENT_REPO")"
+    tag="$(get_latest_remote_tag "$AGENT_REPO")" || tag=""
     if [ -z "$tag" ]; then
       err "could not determine latest agent version from GitHub API"
       return 1
@@ -1208,7 +1208,7 @@ cmd_upgrade_global() {
 
   if [ "$version_arg" = "latest" ]; then
     log "querying GitHub for latest release..."
-    target_tag="$(get_latest_remote_tag "$AGENT_REPO")"
+    target_tag="$(get_latest_remote_tag "$AGENT_REPO")" || target_tag=""
     if [ -z "$target_tag" ]; then
       err "failed to determine latest version from GitHub API"
       err "hint: check network access or specify a version: $PROG upgrade agent-v0.2.0"

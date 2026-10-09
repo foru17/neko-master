@@ -65,7 +65,14 @@ describe('applyLogLevel', () => {
     expectForwarding([0, 0, 0, 0, 1]);
   });
 
-  it.each(['verbose', ''])('warns once and falls back to info for "%s"', async (level) => {
+  it.each(['', '  '])('treats an empty LOG_LEVEL ("%s") as unset', async (level) => {
+    const { applyLogLevel } = await import('./logger.js');
+    applyLogLevel(level);
+    expect(spies[3]).not.toHaveBeenCalled();
+    expectForwarding([0, 1, 1, 1, 1]);
+  });
+
+  it.each(['verbose'])('warns once and falls back to info for "%s"', async (level) => {
     const { applyLogLevel } = await import('./logger.js');
     applyLogLevel(level);
     expect(spies[3]).toHaveBeenCalledExactlyOnceWith(
