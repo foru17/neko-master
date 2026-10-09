@@ -39,6 +39,7 @@ curl -fsSL https://raw.githubusercontent.com/foru17/neko-master/main/apps/agent/
 - `NEKO_INSTANCE_NAME`：`nekoagent` 管理器中的实例名（默认 `backend-<id>`）
 - `NEKO_BIN_LINK_MODE`：全局 bin 目录软链模式（`auto|true|false`，默认 `auto`）
 - `NEKO_LINK_DIR`：软链目标目录（默认 `/usr/local/bin`）
+- `GITHUB_TOKEN`：查询 GitHub API 时使用的 token；为空时回退到 `GITHUB_PAT`
 
 采集器端可设置 `AGENT_HEARTBEAT_TIMEOUT_MS` 调整 Agent 判定离线的心跳超时（后端列表、自动健康检查与手动测试共用）（毫秒，默认 `90000`，最小 `15000`）。默认值为 Agent 默认 30 秒心跳间隔的 3 倍，用于容忍上报延迟；此变量应配置在采集器进程的环境中，而非 Agent 安装命令中。
 
@@ -58,6 +59,31 @@ nekoagent remove <instance>
 ```bash
 nekoagent uninstall
 ```
+
+### GitHub API rate limit / 私有镜像
+
+查询最新版本遇到 GitHub API 匿名限流时，设置 `GITHUB_TOKEN` 后重试：
+
+```sh
+GITHUB_TOKEN='<github-token>' nekoagent upgrade
+```
+
+安装时，在已下载的 `install.sh` 命令前设置同一变量，并保留原有的 `NEKO_*` 安装参数：
+
+```sh
+GITHUB_TOKEN='<github-token>' \
+NEKO_SERVER='http://your-panel:3000' \
+NEKO_BACKEND_ID='13' \
+NEKO_BACKEND_TOKEN='ag_xxx' \
+NEKO_GATEWAY_TYPE='clash' \
+NEKO_GATEWAY_URL='http://127.0.0.1:9090' \
+sh ./install.sh
+```
+
+优先使用非空的 `GITHUB_TOKEN`，否则读取 `GITHUB_PAT`。token 仅用于 `https://api.github.com` 请求，不会发送到 Release 二进制、原始文件或镜像下载地址，也不会写入实例配置。使用私有镜像时，若安装仍需查询 GitHub 最新版本，可用此变量为 API 查询鉴权；镜像下载本身的访问权限须单独解决。
+
+- `GitHub token rejected (401)`：token 无效或已失效，请更换后重试。
+- `GitHub API rate limit or forbidden (HTTP 403); set GITHUB_TOKEN`（或 `HTTP 429`）：API 限流或禁止访问；设置有效 token，并检查权限或等待限额恢复。
 
 ## 手动安装
 

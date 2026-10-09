@@ -2,6 +2,19 @@
 
 [中文](./troubleshooting.md) | **English**
 
+## GitHub API rate limit / private mirrors
+
+When installation or upgrade queries the latest version:
+
+- `GitHub token rejected (401)`: the token is invalid or expired; replace it.
+- `GitHub API rate limit or forbidden (HTTP 403); set GITHUB_TOKEN` (or `HTTP 429`): the API is rate-limited or access is forbidden; set a valid token and check permissions or wait for the limit to reset.
+
+```sh
+GITHUB_TOKEN='<github-token>' nekoagent upgrade
+```
+
+You can also set `GITHUB_TOKEN` and rerun a downloaded `install.sh`, preserving your existing `NEKO_*` settings; see the [install guide](./install.en.md#github-api-rate-limit--private-mirrors). A non-empty `GITHUB_TOKEN` takes precedence; otherwise, `GITHUB_PAT` is used. The token is sent only to `https://api.github.com`, is not saved in instance configs, and is never sent to release binaries, raw files, or private mirror download URLs. Private mirror download authentication must be handled separately.
+
 ## `exec format error`
 
 Cause: binary architecture mismatch.

@@ -55,6 +55,24 @@ detect_existing_install() {
 	return 1
 }
 
+wget_with_retries() (
+	# BusyBox wget may not support --tries; keep its fallback bounded too.
+	if wget --help 2>&1 | grep -q -- --tries; then
+		wget --timeout=120 --tries=3 "$@"
+		return $?
+	fi
+	attempt=0
+	while [ "$attempt" -lt 3 ]; do
+		if wget --timeout=120 "$@"; then
+			return 0
+		else
+			download_status=$?
+		fi
+		attempt=$((attempt + 1))
+	done
+	return "$download_status"
+)
+
 download_file() {
 	url="$1"
 	output="$2"
@@ -65,7 +83,7 @@ download_file() {
 		return $?
 	fi
 	if command -v wget >/dev/null 2>&1; then
-		wget -qO "$output" --timeout=120 --tries=3 "$url"
+		wget_with_retries -qO "$output" "$url"
 		return $?
 	fi
 	echo "[neko-agent] error: curl or wget is required" >&2
@@ -101,23 +119,61 @@ normalize_arch() {
 }
 
 # Query GitHub releases API for the latest agent tag (e.g. "agent-v0.2.0").
-# Returns empty string on failure.
+# Reports HTTP/download errors on stderr and returns non-zero on failure.
 #
 # The repo publishes BOTH main-app (v*) and agent (agent-v*) releases into the
 # same namespace, and either may be marked "latest". So we must NOT use the
 # releases/latest endpoint — it can resolve to a main-app release that carries
 # no agent binaries. Instead list recent releases and pick the newest agent-v*.
-get_latest_remote_tag() {
+get_latest_remote_tag() (
 	repo="${1:-foru17/neko-master}"
 	api_url="https://api.github.com/repos/${repo}/releases?per_page=100"
-	tag=""
+	token="${GITHUB_TOKEN:-${GITHUB_PAT:-}}"
+	# Isolate temporary files, credentials and traps from the install/upgrade flow.
+	umask 077
+	api_tmp_dir="$(mktemp -d)" || return 1
+	trap 'rm -rf "$api_tmp_dir"' 0
+	trap 'exit 1' 1 2 15
+	request_status=0
 	if command -v curl >/dev/null 2>&1; then
-		tag="$(curl -fsSL "$api_url" 2>/dev/null | awk -F'"' '/"tag_name"/{print $4}' | grep '^agent-v' | head -1)"
+		set -- -fsSL --connect-timeout 10 --max-time 120 --retry 3 --retry-delay 2
+		if [ -n "$token" ]; then
+			set -- "$@" -H "Authorization: Bearer $token"
+		fi
+		http_code="$(curl "$@" -o "$api_tmp_dir/body" -w '%{http_code}' "$api_url" 2>/dev/null)" || request_status=$?
 	elif command -v wget >/dev/null 2>&1; then
-		tag="$(wget -qO- "$api_url" 2>/dev/null | awk -F'"' '/"tag_name"/{print $4}' | grep '^agent-v' | head -1)"
+		set -- -S -O "$api_tmp_dir/body"
+		if [ -n "$token" ]; then
+			set -- "$@" --header="Authorization: Bearer $token"
+		fi
+		wget_with_retries "$@" "$api_url" 2>"$api_tmp_dir/headers" || request_status=$?
+		http_code="$(awk '$1 ~ /^HTTP\// && $2 ~ /^[0-9][0-9][0-9]$/ {code=$2} END {print code}' "$api_tmp_dir/headers")"
+	else
+		echo "[neko-agent] error: curl or wget is required" >&2
+		return 1
+	fi
+
+	case "$http_code" in
+		401) api_error="GitHub token rejected (401)" ;;
+		403|429) api_error="GitHub API rate limit or forbidden (HTTP $http_code); set GITHUB_TOKEN" ;;
+		2??) api_error="" ;;
+		*) api_error="GitHub API request failed (HTTP ${http_code:-unknown})" ;;
+	esac
+	if [ -n "$api_error" ]; then
+		echo "[neko-agent] error: $api_error" >&2
+		return 1
+	fi
+	if [ "$request_status" -ne 0 ]; then
+		echo "[neko-agent] error: GitHub API download failed (HTTP $http_code; downloader exit $request_status)" >&2
+		return 1
+	fi
+	tag="$(awk -F'"' '/"tag_name"/{print $4}' "$api_tmp_dir/body" | grep '^agent-v' | head -1)"
+	if [ -z "$tag" ]; then
+		echo "[neko-agent] error: no agent-v* release found in GitHub API response" >&2
+		return 1
 	fi
 	printf '%s\n' "$tag"
-}
+)
 
 compute_sha256() {
 	file="$1"

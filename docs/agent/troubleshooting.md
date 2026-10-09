@@ -2,6 +2,19 @@
 
 **中文 | [English](./troubleshooting.en.md)**
 
+## GitHub API rate limit / 私有镜像
+
+安装或升级查询最新版本时：
+
+- `GitHub token rejected (401)`：token 无效或已失效，请更换。
+- `GitHub API rate limit or forbidden (HTTP 403); set GITHUB_TOKEN`（或 `HTTP 429`）：API 限流或禁止访问，请设置有效 token，并检查权限或等待限额恢复。
+
+```sh
+GITHUB_TOKEN='<github-token>' nekoagent upgrade
+```
+
+也可设置 `GITHUB_TOKEN` 后重新运行已下载的 `install.sh`，保留原有 `NEKO_*` 参数，见[安装指南](./install.md#github-api-rate-limit--私有镜像)。非空的 `GITHUB_TOKEN` 优先，否则读取 `GITHUB_PAT`。token 仅发送给 `https://api.github.com`，不会写入实例配置，也不会发送给 Release 二进制、原始文件或私有镜像下载地址；私有镜像的下载鉴权须单独解决。
+
 ## `exec format error`
 
 原因：二进制架构与主机不匹配。

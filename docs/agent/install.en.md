@@ -39,6 +39,7 @@ Optional env:
 - `NEKO_INSTANCE_NAME`: instance name for `nekoagent` manager (default `backend-<id>`)
 - `NEKO_BIN_LINK_MODE`: `auto|true|false` for symlink into global bin dir (default `auto`)
 - `NEKO_LINK_DIR`: global bin dir for symlink (default `/usr/local/bin`)
+- `GITHUB_TOKEN`: token for GitHub API queries; falls back to `GITHUB_PAT` when empty
 
 Set `AGENT_HEARTBEAT_TIMEOUT_MS` in the collector process environment to adjust how long an agent may stay silent before it is shown offline (backend list, automatic health checks and manual test) (milliseconds, default `90000`, minimum `15000`). The default allows 3 × the agent's default 30-second heartbeat interval to tolerate delayed reports; this is a collector setting, not an agent install option.
 
@@ -58,6 +59,31 @@ Uninstall binaries:
 ```bash
 nekoagent uninstall
 ```
+
+### GitHub API rate limit / private mirrors
+
+If fetching the latest version hits GitHub's anonymous API rate limit, set `GITHUB_TOKEN` and retry:
+
+```sh
+GITHUB_TOKEN='<github-token>' nekoagent upgrade
+```
+
+For installation, set the same variable before running a downloaded `install.sh`, preserving your existing `NEKO_*` installation settings:
+
+```sh
+GITHUB_TOKEN='<github-token>' \
+NEKO_SERVER='http://your-panel:3000' \
+NEKO_BACKEND_ID='13' \
+NEKO_BACKEND_TOKEN='ag_xxx' \
+NEKO_GATEWAY_TYPE='clash' \
+NEKO_GATEWAY_URL='http://127.0.0.1:9090' \
+sh ./install.sh
+```
+
+A non-empty `GITHUB_TOKEN` takes precedence; otherwise, `GITHUB_PAT` is used. The token is sent only to `https://api.github.com`, never to release binaries, raw files, or mirror download URLs, and is not saved in instance configs. If installation with a private mirror still queries GitHub for the latest version, this variable authenticates that API query; access to the mirror download itself must be handled separately.
+
+- `GitHub token rejected (401)`: the token is invalid or expired; replace it and retry.
+- `GitHub API rate limit or forbidden (HTTP 403); set GITHUB_TOKEN` (or `HTTP 429`): the API is rate-limited or access is forbidden; set a valid token and check permissions or wait for the limit to reset.
 
 ## Manual install
 
