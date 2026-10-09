@@ -57,6 +57,76 @@ export function computeRate(samples: TotalsSample[], now: number): TransferRate 
   };
 }
 
+export interface RateTrackerState {
+  samples: TotalsSample[];
+  windowKey: string;
+  sourceKey: string;
+  enabled: boolean;
+  /** Totals on screen at the moment of a switch; ignored until they change. */
+  pending: Pick<TotalsSample, "download" | "upload"> | null;
+}
+
+export interface RateTrackerInput {
+  at: number;
+  download: number | undefined;
+  upload: number | undefined;
+  windowKey: string;
+  sourceKey: string;
+  enabled: boolean;
+}
+
+export const initialRateTrackerState: RateTrackerState = {
+  samples: [],
+  windowKey: "",
+  sourceKey: "",
+  enabled: false,
+  pending: null,
+};
+
+/**
+ * Advance the tracker with the latest totals.
+ *
+ * Queries keep showing the previous data while a new window or backend
+ * loads, so the first totals after a switch still belong to the old window.
+ * Using them as a baseline would turn the jump to the new totals into a huge
+ * spurious rate, so they are held back until the totals actually change.
+ *
+ * `clear` tells the caller to drop the displayed reading (backend switched or
+ * tracking disabled); `rate` is a fresh reading when one is available.
+ */
+export function stepRateTracker(
+  state: RateTrackerState,
+  input: RateTrackerInput,
+): { state: RateTrackerState; rate: TransferRate | null; clear: boolean } {
+  const { at, download, upload, windowKey, sourceKey, enabled } = input;
+  const sourceChanged = state.sourceKey !== sourceKey;
+  const switched =
+    sourceChanged || state.windowKey !== windowKey || (enabled && !state.enabled);
+  const clear = sourceChanged || !enabled;
+  const hasTotals = download !== undefined && upload !== undefined;
+
+  let samples = state.samples;
+  let pending = state.pending;
+  if (switched || !enabled) {
+    samples = [];
+    pending = hasTotals ? { download, upload } : null;
+  }
+
+  const base = { windowKey, sourceKey, enabled };
+  if (!enabled || !hasTotals) {
+    return { state: { ...base, samples, pending }, rate: null, clear };
+  }
+  if (pending && pending.download === download && pending.upload === upload) {
+    return { state: { ...base, samples, pending }, rate: null, clear };
+  }
+  samples = pushSample(samples, { at, download, upload });
+  return {
+    state: { ...base, samples, pending: null },
+    rate: computeRate(samples, at),
+    clear,
+  };
+}
+
 /**
  * Track the live rate of cumulative totals.
  * - `windowKey` changes when the queried window moves (rolling presets shift
@@ -70,29 +140,25 @@ export function useTransferRate(
   upload: number | undefined,
   { windowKey, sourceKey, enabled }: { windowKey: string; sourceKey: string; enabled: boolean },
 ): TransferRate | null {
-  const samplesRef = useRef<TotalsSample[]>([]);
-  const windowKeyRef = useRef(windowKey);
-  const sourceKeyRef = useRef(sourceKey);
+  const trackerRef = useRef<RateTrackerState>(initialRateTrackerState);
   const lastReadingAtRef = useRef(0);
   const [rate, setRate] = useState<TransferRate | null>(null);
 
   useEffect(() => {
-    if (sourceKeyRef.current !== sourceKey || !enabled) {
-      sourceKeyRef.current = sourceKey;
-      windowKeyRef.current = windowKey;
-      samplesRef.current = [];
-      setRate(null);
-    } else if (windowKeyRef.current !== windowKey) {
-      windowKeyRef.current = windowKey;
-      samplesRef.current = [];
-    }
-    if (!enabled || download === undefined || upload === undefined) return;
     const now = Date.now();
-    samplesRef.current = pushSample(samplesRef.current, { at: now, download, upload });
-    const next = computeRate(samplesRef.current, now);
-    if (next) {
+    const step = stepRateTracker(trackerRef.current, {
+      at: now,
+      download,
+      upload,
+      windowKey,
+      sourceKey,
+      enabled,
+    });
+    trackerRef.current = step.state;
+    if (step.clear) setRate(null);
+    if (step.rate) {
       lastReadingAtRef.current = now;
-      setRate(next);
+      setRate(step.rate);
     }
   }, [download, upload, windowKey, sourceKey, enabled]);
 
