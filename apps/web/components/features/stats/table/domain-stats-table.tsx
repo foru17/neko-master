@@ -12,6 +12,7 @@ import {
   ChevronDown,
   ChevronUp,
   Server,
+  Download,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Card, CardContent } from "@/components/ui/card";
@@ -24,6 +25,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { formatBytes, formatDuration, formatNumber } from "@/lib/utils";
+import { downloadTextFile, getDomainsExportFilename } from "@/lib/download-text-file";
 import { cn } from "@/lib/utils";
 import { api, type TimeRange } from "@/lib/api";
 import { useStableTimeRange } from "@/lib/hooks/use-stable-time-range";
@@ -362,13 +364,33 @@ export function DomainStatsTable({
                 {totalItems} {t("domainsCount")}
               </p>
             </div>
-            <div className="relative">
-              <Input
-                placeholder={t("search")}
-                value={search}
-                onChange={(e) => handleSearchInputChange(e.target.value)}
-                className="h-9 w-full sm:w-[240px] bg-secondary/50 border-0"
-              />
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1 sm:flex-none">
+                <Input
+                  placeholder={t("search")}
+                  value={search}
+                  onChange={(e) => handleSearchInputChange(e.target.value)}
+                  className="h-9 w-full sm:w-[240px] bg-secondary/50 border-0"
+                />
+              </div>
+              {!isRemoteMode && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-9 w-9 shrink-0"
+                  disabled={filteredDomains.length === 0}
+                  aria-label={t("exportDomains")}
+                  title={t("exportDomains")}
+                  onClick={() =>
+                    downloadTextFile(
+                      getDomainsExportFilename(ruleName || sourceChain || sourceIP || title || "domains"),
+                      filteredDomains.map((item) => item.domain).filter(Boolean),
+                    )
+                  }>
+                  <Download className="h-4 w-4" />
+                </Button>
+              )}
             </div>
           </div>
         </div>
