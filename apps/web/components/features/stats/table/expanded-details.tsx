@@ -1,10 +1,12 @@
 "use client";
 
-import { Building2, Globe, Link2, Loader2, MapPin, Network, Server, Waypoints } from "lucide-react";
+import { Building2, Download, Globe, Link2, Loader2, MapPin, Network, Server, Waypoints } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { CountryFlag } from "@/components/features/countries";
 import { Favicon } from "@/components/common";
 import { DomainPreview } from "@/components/features/domains";
+import { Button } from "@/components/ui/button";
+import { downloadTextFile, getDomainsExportFilename } from "@/lib/download-text-file";
 import { getDomainColor, getIPGradient } from "@/lib/stats-utils";
 import { formatBytes, formatNumber } from "@/lib/utils";
 import { useCountryName } from "@/lib/i18n-country";
@@ -319,6 +321,28 @@ function DomainFallbackChips({ domains }: { domains: string[] }) {
   );
 }
 
+function ExportDomainsButton({ entityName, domains }: { entityName: string; domains: string[] }) {
+  const t = useTranslations("domains");
+
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      className="ml-auto h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-muted/60 dark:text-muted-foreground dark:hover:text-foreground dark:hover:bg-muted/60"
+      aria-label={t("exportDomains")}
+      title={t("exportDomains")}
+      disabled={domains.length === 0}
+      onClick={(event) => {
+        event.stopPropagation();
+        downloadTextFile(getDomainsExportFilename(entityName), domains);
+      }}
+    >
+      <Download className="size-3" />
+    </Button>
+  );
+}
+
 export function DomainExpandedDetails({
   domain,
   richExpand = true,
@@ -462,6 +486,13 @@ export function IPExpandedDetails({
   const domainsT = useTranslations("domains");
   const ipsT = useTranslations("ips");
   const localizedName = useCountryName();
+  const associatedDomains = !richExpand
+    ? ip.domains || []
+    : domainDetailsLoading
+      ? []
+      : domainDetails.length > 0
+        ? domainDetails.map((domain) => domain.domain)
+        : ip.domains || [];
 
   const geo = normalizeGeoIP(ip.geoIP);
   const countryCode = geo?.countryCode;
@@ -536,6 +567,7 @@ export function IPExpandedDetails({
             <p className="text-xs font-medium text-muted-foreground mb-2.5 flex items-center gap-1.5">
               <AssociatedDomainsTitleIcon className="h-3 w-3" />
               {labels.associatedDomains}
+              <ExportDomainsButton entityName={ip.ip} domains={associatedDomains} />
             </p>
             <DomainFallbackChips domains={ip.domains || []} />
           </div>
@@ -584,6 +616,7 @@ export function IPExpandedDetails({
           <p className="text-xs font-medium text-muted-foreground mb-2.5 flex items-center gap-1.5">
             <AssociatedDomainsTitleIcon className="h-3 w-3" />
             {labels.associatedDomains}
+            <ExportDomainsButton entityName={ip.ip} domains={associatedDomains} />
           </p>
           {domainDetailsLoading ? (
             <AssociatedLoadingList count={ip.domains?.length ?? 0} />

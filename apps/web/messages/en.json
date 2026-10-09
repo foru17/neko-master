@@ -156,6 +156,7 @@
     "domainList": "Domains",
     "ipList": "IP Addresses",
     "associatedDomains": "Associated Domains",
+    "exportDomains": "Export domains",
     "associatedIPs": "Associated IP Addresses",
     "search": "Search domains...",
     "noResults": "No domains found",

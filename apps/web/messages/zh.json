@@ -127,6 +127,7 @@
   },
   "topDomains": {
     "title": "热门域名",
+    "topDomains": "热门域名",
     "sortByTraffic": "按流量排序",
     "sortByConnections": "按连接数排序",
     "viewAll": "查看全部",
@@ -155,6 +156,7 @@
     "domainList": "域名",
     "ipList": "IP 地址",
     "associatedDomains": "关联域名",
+    "exportDomains": "导出域名",
     "associatedIPs": "关联 IP 地址",
     "search": "搜索域名...",
     "noResults": "未找到域名",
