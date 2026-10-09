@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   AreaChart,
   Area,
@@ -33,6 +33,73 @@ interface TrafficTrendChartProps {
   onTimeRangeChange?: (range: TimeRange) => void;
   isLoading?: boolean;
   emptyHint?: string;
+}
+
+interface TrendTooltipProps {
+  active?: boolean;
+  payload?: Array<{ payload: { time: string; download: number; upload: number } }>;
+  granularity: TrendGranularity;
+  formatValue: (value: number) => string;
+  labels: { download: string; upload: string; total: string };
+}
+
+// Module-level so it is not re-created on every render; recharts injects
+// `active` and `payload` when it clones the element.
+function TrendTooltip({ active, payload, granularity, formatValue, labels }: TrendTooltipProps) {
+  if (active && payload && payload.length) {
+    const dataPoint = payload[0].payload;
+    // Append Z to indicate UTC if not present, then convert to local
+    const timeStr = dataPoint.time.endsWith("Z")
+      ? dataPoint.time
+      : dataPoint.time + "Z";
+    const date = new Date(timeStr);
+    const title =
+      granularity === "day"
+        ? date.toLocaleDateString(undefined, {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+          })
+        : date.toLocaleString(undefined, {
+            month: "short",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          });
+    return (
+      <div className="bg-popover border border-border rounded-lg p-3 shadow-lg">
+        <p className="text-xs text-muted-foreground mb-2">{title}</p>
+        <div className="space-y-1">
+          <p className="text-sm flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-blue-500" />
+            <span className="text-muted-foreground">
+              {labels.download}:
+            </span>
+            <span className="font-medium tabular-nums">
+              {formatValue(dataPoint.download)}
+            </span>
+          </p>
+          <p className="text-sm flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-purple-500" />
+            <span className="text-muted-foreground">
+              {labels.upload}:
+            </span>
+            <span className="font-medium tabular-nums">
+              {formatValue(dataPoint.upload)}
+            </span>
+          </p>
+          <p className="text-sm flex items-center gap-2 pt-1 border-t border-border/50 mt-1">
+            <span className="w-2 h-2 rounded-full bg-transparent" />
+            <span className="text-muted-foreground">{labels.total}:</span>
+            <span className="font-semibold tabular-nums">
+              {formatValue(dataPoint.download + dataPoint.upload)}
+            </span>
+          </p>
+        </div>
+      </div>
+    );
+  }
+  return null;
 }
 
 /** Wall clock that ticks while `enabled`, without calling Date.now during render. */
@@ -73,9 +140,10 @@ export const TrafficTrendChart = React.memo(
     const rangeEndMs = Math.max(rangeEnd ? new Date(rangeEnd).getTime() || 0 : 0, nowMs);
     
     // Track if we've ever received data to avoid showing empty state on initial load
-    const hasEverReceivedData = useRef(false);
-    if (data.length > 0) {
-      hasEverReceivedData.current = true;
+    const [hasEverReceivedData, setHasEverReceivedData] = useState(false);
+    if (data.length > 0 && !hasEverReceivedData) {
+      // Adjusting state while rendering (React's documented pattern) instead of a ref.
+      setHasEverReceivedData(true);
     }
 
     const selectorOptions = useMemo(() => {
@@ -151,70 +219,10 @@ export const TrafficTrendChart = React.memo(
       });
     }, [data, granularity, mode, bucketSeconds, rangeEndMs]);
 
-    // Custom tooltip - show local time
-    const CustomTooltip = React.useCallback(
-      ({ active, payload }: any) => {
-        if (active && payload && payload.length) {
-          const dataPoint = payload[0].payload;
-          // Append Z to indicate UTC if not present, then convert to local
-          const timeStr = dataPoint.time.endsWith("Z")
-            ? dataPoint.time
-            : dataPoint.time + "Z";
-          const date = new Date(timeStr);
-          const title =
-            granularity === "day"
-              ? date.toLocaleDateString(undefined, {
-                  year: "numeric",
-                  month: "short",
-                  day: "numeric",
-                })
-              : date.toLocaleString(undefined, {
-                  month: "short",
-                  day: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                });
-          return (
-            <div className="bg-popover border border-border rounded-lg p-3 shadow-lg">
-              <p className="text-xs text-muted-foreground mb-2">{title}</p>
-              <div className="space-y-1">
-                <p className="text-sm flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-blue-500" />
-                  <span className="text-muted-foreground">
-                    {chartT("download")}:
-                  </span>
-                  <span className="font-medium tabular-nums">
-                    {formatValue(dataPoint.download)}
-                  </span>
-                </p>
-                <p className="text-sm flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-purple-500" />
-                  <span className="text-muted-foreground">
-                    {chartT("upload")}:
-                  </span>
-                  <span className="font-medium tabular-nums">
-                    {formatValue(dataPoint.upload)}
-                  </span>
-                </p>
-                <p className="text-sm flex items-center gap-2 pt-1 border-t border-border/50 mt-1">
-                  <span className="w-2 h-2 rounded-full bg-transparent" />
-                  <span className="text-muted-foreground">{t("total")}:</span>
-                  <span className="font-semibold tabular-nums">
-                    {formatValue(dataPoint.download + dataPoint.upload)}
-                  </span>
-                </p>
-              </div>
-            </div>
-          );
-        }
-        return null;
-      },
-      [chartT, t, granularity, formatValue],
-    );
 
     // Loading skeleton - show when loading or on initial load with no data yet
     // This prevents flickering from empty state to skeleton on first load
-    if ((isLoading && chartData.length === 0) || (chartData.length === 0 && !hasEverReceivedData.current)) {
+    if ((isLoading && chartData.length === 0) || (chartData.length === 0 && !hasEverReceivedData)) {
       return (
         <Card className="h-full">
           <CardHeader className="pb-2">
@@ -250,7 +258,7 @@ export const TrafficTrendChart = React.memo(
 
     // If no data and we've previously received data, show empty state
     // Otherwise (initial load with no data), keep showing skeleton to avoid flickering
-    if (!isLoading && chartData.length === 0 && hasEverReceivedData.current) {
+    if (!isLoading && chartData.length === 0 && hasEverReceivedData) {
       return (
         <Card className="h-full">
           <CardHeader className="pb-2">
@@ -459,9 +467,21 @@ export const TrafficTrendChart = React.memo(
                         ? `${formatBytes(value, 1).replace(" ", "")}/s`
                         : formatBytes(value).replace(" ", "")
                     }
-                    width={mode === "speed" ? 70 : 50}
+                    width={mode === "speed" ? 70 : 60}
                   />
-                  <Tooltip content={<CustomTooltip />} />
+                  <Tooltip
+                    content={
+                      <TrendTooltip
+                        granularity={granularity}
+                        formatValue={formatValue}
+                        labels={{
+                          download: chartT("download"),
+                          upload: chartT("upload"),
+                          total: t("total"),
+                        }}
+                      />
+                    }
+                  />
                   <Area
                     type="monotone"
                     dataKey="download"
