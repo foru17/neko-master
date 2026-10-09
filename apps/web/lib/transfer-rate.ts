@@ -18,7 +18,8 @@ export interface TransferRate {
 }
 
 export const RATE_WINDOW_MS = 15_000;
-const MIN_SPAN_MS = 2_000;
+// Pushes arrive every ~3s with some jitter; a longer span keeps it small.
+const MIN_SPAN_MS = 5_000;
 const MAX_SAMPLE_AGE_MS = 30_000;
 
 /**
@@ -62,8 +63,10 @@ export interface RateTrackerState {
   windowKey: string;
   sourceKey: string;
   enabled: boolean;
-  /** Totals on screen at the moment of a switch; ignored until they change. */
+  /** Last totals held back after a switch; ignored until they change. */
   pending: Pick<TotalsSample, "download" | "upload"> | null;
+  /** How many more distinct totals to hold back before sampling. */
+  holds: number;
 }
 
 export interface RateTrackerInput {
@@ -81,15 +84,19 @@ export const initialRateTrackerState: RateTrackerState = {
   sourceKey: "",
   enabled: false,
   pending: null,
+  holds: 0,
 };
 
 /**
  * Advance the tracker with the latest totals.
  *
- * Queries keep showing the previous data while a new window or backend
- * loads, so the first totals after a switch still belong to the old window.
- * Using them as a baseline would turn the jump to the new totals into a huge
- * spurious rate, so they are held back until the totals actually change.
+ * After a switch (or the first mount) two kinds of totals are unusable as a
+ * baseline and are held back:
+ * - totals carried over from the old window or backend, which queries keep
+ *   showing while the new one loads;
+ * - the first fresh totals, which may come from the HTTP summary (persisted
+ *   data only) while later pushes also include the realtime buffer.
+ * Either would turn the next jump into a huge spurious rate.
  *
  * `clear` tells the caller to drop the displayed reading (backend switched or
  * tracking disabled); `rate` is a fresh reading when one is available.
@@ -107,21 +114,31 @@ export function stepRateTracker(
 
   let samples = state.samples;
   let pending = state.pending;
+  let holds = state.holds;
   if (switched || !enabled) {
     samples = [];
     pending = hasTotals ? { download, upload } : null;
+    // Besides the carried-over totals (pending), skip the first fresh value.
+    holds = 1;
   }
 
   const base = { windowKey, sourceKey, enabled };
   if (!enabled || !hasTotals) {
-    return { state: { ...base, samples, pending }, rate: null, clear };
+    return { state: { ...base, samples, pending, holds }, rate: null, clear };
   }
   if (pending && pending.download === download && pending.upload === upload) {
-    return { state: { ...base, samples, pending }, rate: null, clear };
+    return { state: { ...base, samples, pending, holds }, rate: null, clear };
+  }
+  if (holds > 0) {
+    return {
+      state: { ...base, samples, pending: { download, upload }, holds: holds - 1 },
+      rate: null,
+      clear,
+    };
   }
   samples = pushSample(samples, { at, download, upload });
   return {
-    state: { ...base, samples, pending: null },
+    state: { ...base, samples, pending: null, holds: 0 },
     rate: computeRate(samples, at),
     clear,
   };
