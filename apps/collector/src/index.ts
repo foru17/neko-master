@@ -94,7 +94,7 @@ async function main() {
   // realtime" never misses the flushed interval.
   realtimeStore.onCleared((backendId) => {
     db.clearRangeQueryCache(backendId);
-    wsServer?.invalidateBackendCache(backendId);
+    wsServer?.clearBackendCache(backendId);
   });
 
   // Initialize policy sync service

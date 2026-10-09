@@ -915,14 +915,6 @@ export class StatsWebSocketServer {
     };
   }
 
-  /** Drop cached persisted summaries of a backend (its realtime deltas were just persisted). */
-  invalidateBackendCache(backendId: number): void {
-    const prefix = `${backendId}|`;
-    for (const key of this.baseSummaryCache.keys()) {
-      if (key.startsWith(prefix)) this.baseSummaryCache.delete(key);
-    }
-  }
-
   private getBaseSummaryCacheTTL(range: ClientRange): number {
     if (!range.end) return StatsWebSocketServer.BASE_SUMMARY_CACHE_TTL_MS;
     const endMs = new Date(range.end).getTime();
@@ -1173,10 +1165,13 @@ export class StatsWebSocketServer {
     const clientInfo = this.clients.get(ws);
     if (!clientInfo) return;
 
+    // The range this payload is computed for; the subscription may change
+    // while the query runs.
+    const range = clientInfo.range;
     try {
       const stats = await this.getStatsForBackend(
         clientInfo.backendId,
-        clientInfo.range,
+        range,
         clientInfo.trend,
         clientInfo.deviceDetail,
         clientInfo.proxyDetail,
@@ -1196,6 +1191,8 @@ export class StatsWebSocketServer {
         summaryFields: clientInfo.includeSummary
           ? this.buildSummaryFieldList(clientInfo.summaryFields)
           : undefined,
+        start: range.start,
+        end: range.end,
         data: stats,
         timestamp: new Date().toISOString(),
       };
@@ -1275,13 +1272,14 @@ export class StatsWebSocketServer {
         const ipsPageKey = clientInfo.ipsPage
           ? `${clientInfo.ipsPage.offset}|${clientInfo.ipsPage.limit}|${clientInfo.ipsPage.sortBy || ''}|${clientInfo.ipsPage.sortOrder || ''}|${clientInfo.ipsPage.search || ''}`
           : '';
-        const cacheKey = `${resolvedBackendId}|${clientInfo.range.start || ''}|${clientInfo.range.end || ''}|${includeSummaryKey}|${summaryFieldsKey}|${trendKey}|${deviceDetailKey}|${proxyDetailKey}|${ruleDetailKey}|${ruleChainFlowKey}|${domainsPageKey}|${ipsPageKey}`;
+        const range = clientInfo.range;
+        const cacheKey = `${resolvedBackendId}|${range.start || ''}|${range.end || ''}|${includeSummaryKey}|${summaryFieldsKey}|${trendKey}|${deviceDetailKey}|${proxyDetailKey}|${ruleDetailKey}|${ruleChainFlowKey}|${domainsPageKey}|${ipsPageKey}`;
         if (!jsonCache.has(cacheKey)) {
           jsonCache.set(
             cacheKey,
             this.getStatsForBackend(
               resolvedBackendId,
-              clientInfo.range,
+              range,
               clientInfo.trend,
               clientInfo.deviceDetail,
               clientInfo.proxyDetail,
@@ -1296,6 +1294,8 @@ export class StatsWebSocketServer {
                 ? JSON.stringify({
                   type: 'stats',
                   backendId: resolvedBackendId,
+                  start: range.start,
+                  end: range.end,
                   summaryFields: clientInfo.includeSummary
                     ? this.buildSummaryFieldList(clientInfo.summaryFields)
                     : undefined,

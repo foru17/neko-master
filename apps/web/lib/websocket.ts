@@ -44,10 +44,24 @@ export interface LiveConnection {
 interface WebSocketMessage {
   type: 'stats' | 'ping' | 'pong';
   backendId?: number;
+  /** Range the payload was computed for. */
+  start?: string;
+  end?: string;
   summaryFields?: SummaryField[];
   data?: StatsSummary;
   liveConnections?: LiveConnection[];
   timestamp: string;
+}
+
+function sameInstant(a?: string, b?: string): boolean {
+  if (!a || !b) return a === b;
+  return new Date(a).getTime() === new Date(b).getTime();
+}
+
+/** True when the push carries a range that differs from the current subscription. */
+function isOtherRange(message: WebSocketMessage, range?: TimeRange): boolean {
+  if (!range || (message.start === undefined && message.end === undefined)) return false;
+  return !sameInstant(message.start, range.start) || !sameInstant(message.end, range.end);
 }
 
 interface UseStatsWebSocketOptions {
@@ -251,6 +265,7 @@ export function useStatsWebSocket(options: UseStatsWebSocketOptions = {}) {
   const summaryFieldsKeyRef = useRef(summaryFieldsDependencyKey);
   const hasSummaryFieldsFilterRef = useRef(!!normalizedSummaryFields);
   const backendIdRef = useRef(backendId);
+  const rangeRef = useRef(range);
   onMessageRef.current = options.onMessage;
   onConnectRef.current = options.onConnect;
   onDisconnectRef.current = options.onDisconnect;
@@ -259,6 +274,9 @@ export function useStatsWebSocket(options: UseStatsWebSocketOptions = {}) {
   summaryFieldsKeyRef.current = summaryFieldsDependencyKey;
   hasSummaryFieldsFilterRef.current = !!normalizedSummaryFields;
   backendIdRef.current = backendId;
+  useEffect(() => {
+    rangeRef.current = range;
+  }, [range]);
 
   const cleanup = useCallback(() => {
     if (reconnectTimerRef.current) {
@@ -339,6 +357,11 @@ export function useStatsWebSocket(options: UseStatsWebSocketOptions = {}) {
               return;
             }
 
+            // Likewise drop late pushes computed for a previous time range.
+            if (isOtherRange(message, rangeRef.current)) {
+              return;
+            }
+
             if (hasSummaryFieldsFilterRef.current) {
               const incomingSummaryFieldsKey = summaryFieldsKey(message.summaryFields);
               if (
@@ -369,6 +392,11 @@ export function useStatsWebSocket(options: UseStatsWebSocketOptions = {}) {
       ws.onclose = (event) => {
         console.log(`[WebSocket] Disconnected. Code: ${event.code}, Reason: ${event.reason}`);
         setStatus('disconnected');
+        // Consumers fall back to HTTP while disconnected; a stale push must not
+        // reappear (as if current) when the socket reconnects.
+        if (trackLastMessageRef.current) {
+          setLastMessage(null);
+        }
         onDisconnectRef.current?.();
 
         // Clear ping interval

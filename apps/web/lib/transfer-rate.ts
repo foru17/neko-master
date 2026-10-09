@@ -23,18 +23,18 @@ const MIN_SPAN_MS = 5_000;
 const MAX_SAMPLE_AGE_MS = 30_000;
 
 /**
- * Append a sample and drop the window when totals go backwards (range or
- * backend switched underneath us) or when the previous sample is stale.
+ * Append a sample. Within one window cumulative totals never go down, so a
+ * lower value is a stale or inconsistent reading (e.g. an old push shown
+ * again after a reconnect) and is ignored rather than used as a new
+ * baseline. The window restarts when the previous sample is stale.
  */
 export function pushSample(samples: TotalsSample[], next: TotalsSample): TotalsSample[] {
   const last = samples[samples.length - 1];
-  if (
-    last &&
-    (next.download < last.download ||
-      next.upload < last.upload ||
-      next.at - last.at > MAX_SAMPLE_AGE_MS ||
-      next.at < last.at)
-  ) {
+  if (last && next.at - last.at <= MAX_SAMPLE_AGE_MS && next.at >= last.at &&
+      (next.download < last.download || next.upload < last.upload)) {
+    return samples;
+  }
+  if (last && (next.at - last.at > MAX_SAMPLE_AGE_MS || next.at < last.at)) {
     return [next];
   }
   if (last && next.download === last.download && next.upload === last.upload && next.at === last.at) {
@@ -94,8 +94,8 @@ export const initialRateTrackerState: RateTrackerState = {
  * baseline and are held back:
  * - totals carried over from the old window or backend, which queries keep
  *   showing while the new one loads;
- * - the first fresh totals, which may come from the HTTP summary (persisted
- *   data only) while later pushes also include the realtime buffer.
+ * - the first fresh totals, held back too as a precaution: right after a
+ *   switch, HTTP fetches and WS pushes for the new window can still race.
  * Either would turn the next jump into a huge spurious rate.
  *
  * `clear` tells the caller to drop the displayed reading (backend switched or
