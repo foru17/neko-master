@@ -69,8 +69,7 @@ export const TrafficTrendChart = React.memo(
     const bucketSeconds = Math.max(60, Math.round(bucketMinutes * 60));
     const formatValue = mode === "speed" ? formatBytesPerSecond : formatBytes;
     const nowMs = useNow(mode === "speed");
-    // The in-progress bucket only covers the time up to now (or the query end
-    // for historical windows).
+    // Upper bound of complete buckets: now, or the query end for past windows.
     const rangeEndMs = Math.max(rangeEnd ? new Date(rangeEnd).getTime() || 0 : 0, nowMs);
     
     // Track if we've ever received data to avoid showing empty state on initial load
@@ -114,7 +113,17 @@ export const TrafficTrendChart = React.memo(
 
     // Format data for chart - convert UTC to local time
     const chartData = useMemo(() => {
-      return data.map((point) => {
+      // In speed mode, skip the bucket that is still filling: its bytes are
+      // still arriving, so it would always read low. Live speed is on the cards.
+      const bucketMs = bucketSeconds * 1000;
+      const points =
+        mode === "speed" && rangeEndMs
+          ? data.filter((point) => {
+              const start = new Date(point.time.endsWith("Z") ? point.time : `${point.time}Z`).getTime();
+              return !Number.isFinite(start) || start + bucketMs <= rangeEndMs;
+            })
+          : data;
+      return points.map((point) => {
         // Append Z to indicate UTC if not present, then convert to local
         const timeStr = point.time.endsWith("Z")
           ? point.time
@@ -131,10 +140,7 @@ export const TrafficTrendChart = React.memo(
                 minute: "2-digit",
                 hour12: false,
               });
-        const elapsedSeconds = rangeEndMs
-          ? Math.min(bucketSeconds, Math.max(10, (rangeEndMs - date.getTime()) / 1000))
-          : bucketSeconds;
-        const scale = mode === "speed" ? elapsedSeconds : 1;
+        const scale = mode === "speed" ? bucketSeconds : 1;
         return {
           time: point.time,
           download: point.download / scale,
