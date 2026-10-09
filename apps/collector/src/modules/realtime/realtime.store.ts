@@ -230,6 +230,7 @@ export type AgentPolicyState = {
 };
 
 export class RealtimeStore {
+  private clearedListeners = new Set<(backendId: number) => void>();
   private agentConfigByBackend = new Map<number, AgentGatewayConfig>();
   private agentPolicyStateByBackend = new Map<number, AgentPolicyState>();
   public summaryByBackend = new Map<number, SummaryDelta>();
@@ -1418,9 +1419,31 @@ export class RealtimeStore {
     );
   }
 
+  /**
+   * Notify when realtime deltas of a backend were dropped because they are
+   * now persisted. Read caches that hold persisted totals computed before the
+   * write must be invalidated at the same moment, otherwise "cached persisted
+   * + fresh realtime" briefly misses a whole flush interval of traffic.
+   */
+  onCleared(listener: (backendId: number) => void): () => void {
+    this.clearedListeners.add(listener);
+    return () => this.clearedListeners.delete(listener);
+  }
+
+  private notifyCleared(backendId: number): void {
+    for (const listener of this.clearedListeners) {
+      try {
+        listener(backendId);
+      } catch (err) {
+        console.warn('[Realtime] cleared listener failed', err);
+      }
+    }
+  }
+
   clearTrafficSummary(backendId: number): void {
     this.summaryByBackend.delete(backendId);
     this.minuteByBackend.delete(backendId);
+    this.notifyCleared(backendId);
   }
 
   clearTrafficDimensions(backendId: number): void {
@@ -1432,6 +1455,7 @@ export class RealtimeStore {
     this.deviceIPByBackend.delete(backendId);
     this.ruleByBackend.delete(backendId);
     this.ruleChainByBackend.delete(backendId);
+    this.notifyCleared(backendId);
   }
 
   clearTraffic(backendId: number): void {
@@ -1441,6 +1465,7 @@ export class RealtimeStore {
 
   clearCountries(backendId: number): void {
     this.countryByBackend.delete(backendId);
+    this.notifyCleared(backendId);
   }
 
   clearBackend(backendId: number): void {

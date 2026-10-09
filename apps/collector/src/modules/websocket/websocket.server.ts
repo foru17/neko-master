@@ -915,6 +915,14 @@ export class StatsWebSocketServer {
     };
   }
 
+  /** Drop cached persisted summaries of a backend (its realtime deltas were just persisted). */
+  invalidateBackendCache(backendId: number): void {
+    const prefix = `${backendId}|`;
+    for (const key of this.baseSummaryCache.keys()) {
+      if (key.startsWith(prefix)) this.baseSummaryCache.delete(key);
+    }
+  }
+
   private getBaseSummaryCacheTTL(range: ClientRange): number {
     if (!range.end) return StatsWebSocketServer.BASE_SUMMARY_CACHE_TTL_MS;
     const endMs = new Date(range.end).getTime();

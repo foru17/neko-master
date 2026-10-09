@@ -89,6 +89,13 @@ async function main() {
   const statsService = new StatsService(db, realtimeStore);
   wsServer = new StatsWebSocketServer(COLLECTOR_WS_PORT, db, statsService);
   wsServer.start();
+  // Persisted totals are cached for a few seconds; when a flush moves
+  // realtime deltas into storage, drop those caches so "cached persisted +
+  // realtime" never misses the flushed interval.
+  realtimeStore.onCleared((backendId) => {
+    db.clearRangeQueryCache(backendId);
+    wsServer?.invalidateBackendCache(backendId);
+  });
 
   // Initialize policy sync service
   policySyncService = new SurgePolicySyncService(db);
