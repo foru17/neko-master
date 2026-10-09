@@ -12,12 +12,16 @@ This release adds a few small features that users have asked for repeatedly.
 ### Added
 
 - **Live speed and a speed view** ([#93], thanks @seth-shi for the suggestion)
-  - The Total Download and Total Upload cards show the current speed, averaged over the last 15 seconds of cumulative totals. It appears only for live time ranges (not custom ranges) and resets when you switch backends, so it never shows negative or absurd values
+  - The Total Download and Total Upload cards show the current speed, averaged over the last 15 seconds of cumulative totals. It appears only for live time ranges (not custom ranges). After you switch the time range or backend, it waits until the new totals settle (about 10–15 seconds) before calculating, so it never shows negative or absurd values
   - The traffic trend chart has a new Traffic / Speed toggle. Speed is the bytes in each time bucket divided by the bucket length. The newest bucket, which is still filling, is not plotted, so the right edge doesn't dip
 - **Export associated domains** ([#54], thanks @ron159 for the suggestion)
   - Domain lists in the rule, proxy and device views, and in the IP expand panel, have an export button. It saves the full filtered and sorted list as a txt file with one domain per line, ready to paste into your own rule-set
 - **`LOG_LEVEL` environment variable** ([#80], thanks @ilupin for the suggestion)
   - Accepts `error`, `warn`, `info` or `debug` (default `info`) and controls how much the collector process logs. `console.error` is always printed. Output from the container start script and Next.js is not affected
+
+### Fixed
+
+- **Live totals periodically dropped and jumped back** 🐛: after each flush, the realtime deltas in memory are cleared, but query results for persisted data stay cached for a few seconds (8s for DB queries, 2s for live pushes). Until that cache expired, "cached persisted totals + realtime deltas" was missing one flush interval of traffic, so the Total Download/Upload cards dropped every flush and jumped back on the next push. Clearing realtime data on flush now also invalidates both caches, for the mihomo, Surge and agent collection paths
 
 ### Agent (shipped as `agent-v1.4.8`)
 
