@@ -549,7 +549,7 @@ export const api = {
     fetchJson<{ message: string }>(`${API_BASE}/backends/${id}`, 'DELETE'),
     
   setActiveBackend: (id: number) =>
-    fetchJson<{ message: string }>(`${API_BASE}/backends/${id}/activate`, 'POST'),
+    fetchJson<{ message: string }>(`${API_BASE}/backends/${id}/activate`, 'POST', {}),
 
   setBackendListening: (id: number, listening: boolean) =>
     fetchJson<{ message: string }>(`${API_BASE}/backends/${id}/listening`, 'POST', { listening }),
