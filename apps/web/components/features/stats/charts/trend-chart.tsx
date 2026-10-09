@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   AreaChart,
   Area,
@@ -35,6 +35,22 @@ interface TrafficTrendChartProps {
   emptyHint?: string;
 }
 
+/** Wall clock that ticks while `enabled`, without calling Date.now during render. */
+function useNow(enabled: boolean, intervalMs = 5_000): number {
+  const [now, setNow] = useState(0);
+  useEffect(() => {
+    if (!enabled) return;
+    const tick = () => setNow(Date.now());
+    const first = setTimeout(tick, 0);
+    const timer = setInterval(tick, intervalMs);
+    return () => {
+      clearTimeout(first);
+      clearInterval(timer);
+    };
+  }, [enabled, intervalMs]);
+  return now;
+}
+
 export const TrafficTrendChart = React.memo(
   function TrafficTrendChart({
     data,
@@ -52,7 +68,10 @@ export const TrafficTrendChart = React.memo(
     const [mode, setMode] = useState<TrendMode>("traffic");
     const bucketSeconds = Math.max(60, Math.round(bucketMinutes * 60));
     const formatValue = mode === "speed" ? formatBytesPerSecond : formatBytes;
-    const rangeEndMs = rangeEnd ? new Date(rangeEnd).getTime() || 0 : 0;
+    const nowMs = useNow(mode === "speed");
+    // The in-progress bucket only covers the time up to now (or the query end
+    // for historical windows).
+    const rangeEndMs = Math.max(rangeEnd ? new Date(rangeEnd).getTime() || 0 : 0, nowMs);
     
     // Track if we've ever received data to avoid showing empty state on initial load
     const hasEverReceivedData = useRef(false);
@@ -112,9 +131,8 @@ export const TrafficTrendChart = React.memo(
                 minute: "2-digit",
                 hour12: false,
               });
-        // A bucket still in progress only covers the time up to rangeEnd.
         const elapsedSeconds = rangeEndMs
-          ? Math.min(bucketSeconds, Math.max(60, (rangeEndMs - date.getTime()) / 1000))
+          ? Math.min(bucketSeconds, Math.max(10, (rangeEndMs - date.getTime()) / 1000))
           : bucketSeconds;
         const scale = mode === "speed" ? elapsedSeconds : 1;
         return {
