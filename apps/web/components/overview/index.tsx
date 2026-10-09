@@ -297,6 +297,7 @@ export function OverviewTab({
         data={trendData || []}
         granularity={trendGranularity}
         bucketMinutes={trendQuery.bucketMinutes}
+        rangeEnd={trendQuery.end}
         timeRange={canUseTrendSelector ? trendTimeRange : undefined}
         timeRangeOptions={trendTimeOptions}
         onTimeRangeChange={canUseTrendSelector ? handleTimeRangeChange : undefined}

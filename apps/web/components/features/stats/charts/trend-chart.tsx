@@ -26,6 +26,8 @@ interface TrafficTrendChartProps {
   granularity: TrendGranularity;
   /** Bucket size of `data`, used to turn bytes per bucket into bytes/s. */
   bucketMinutes?: number;
+  /** End of the queried window (ISO); the last bucket may be partial. */
+  rangeEnd?: string;
   timeRange?: TimeRange;
   timeRangeOptions?: TimeRange[];
   onTimeRangeChange?: (range: TimeRange) => void;
@@ -38,6 +40,7 @@ export const TrafficTrendChart = React.memo(
     data,
     granularity,
     bucketMinutes = 1,
+    rangeEnd,
     timeRange,
     timeRangeOptions = [],
     onTimeRangeChange,
@@ -49,6 +52,7 @@ export const TrafficTrendChart = React.memo(
     const [mode, setMode] = useState<TrendMode>("traffic");
     const bucketSeconds = Math.max(60, Math.round(bucketMinutes * 60));
     const formatValue = mode === "speed" ? formatBytesPerSecond : formatBytes;
+    const rangeEndMs = rangeEnd ? new Date(rangeEnd).getTime() || 0 : 0;
     
     // Track if we've ever received data to avoid showing empty state on initial load
     const hasEverReceivedData = useRef(false);
@@ -108,7 +112,11 @@ export const TrafficTrendChart = React.memo(
                 minute: "2-digit",
                 hour12: false,
               });
-        const scale = mode === "speed" ? bucketSeconds : 1;
+        // A bucket still in progress only covers the time up to rangeEnd.
+        const elapsedSeconds = rangeEndMs
+          ? Math.min(bucketSeconds, Math.max(60, (rangeEndMs - date.getTime()) / 1000))
+          : bucketSeconds;
+        const scale = mode === "speed" ? elapsedSeconds : 1;
         return {
           time: point.time,
           download: point.download / scale,
@@ -117,7 +125,7 @@ export const TrafficTrendChart = React.memo(
           timestamp: date.getTime(), // for sorting/debugging
         };
       });
-    }, [data, granularity, mode, bucketSeconds]);
+    }, [data, granularity, mode, bucketSeconds, rangeEndMs]);
 
     // Custom tooltip - show local time
     const CustomTooltip = React.useCallback(
@@ -423,9 +431,11 @@ export const TrafficTrendChart = React.memo(
                     tickLine={false}
                     tick={{ fontSize: 10, fill: "#888888" }}
                     tickFormatter={(value) =>
-                      formatValue(value).replace(" ", "")
+                      mode === "speed"
+                        ? `${formatBytes(value, 1).replace(" ", "")}/s`
+                        : formatBytes(value).replace(" ", "")
                     }
-                    width={mode === "speed" ? 62 : 50}
+                    width={mode === "speed" ? 70 : 50}
                   />
                   <Tooltip content={<CustomTooltip />} />
                   <Area
@@ -470,6 +480,7 @@ export const TrafficTrendChart = React.memo(
       JSON.stringify(prev.data) === JSON.stringify(next.data) &&
       prev.granularity === next.granularity &&
       prev.bucketMinutes === next.bucketMinutes &&
+      prev.rangeEnd === next.rangeEnd &&
       prev.timeRange === next.timeRange &&
       JSON.stringify(prev.timeRangeOptions) ===
         JSON.stringify(next.timeRangeOptions) &&
