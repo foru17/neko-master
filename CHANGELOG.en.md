@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.3] - 2026-10-09
+
+This release adds a few small features that users have asked for repeatedly.
+
+### Added
+
+- **Live speed and a speed view** ([#93], thanks @seth-shi for the suggestion)
+  - The Total Download and Total Upload cards show the current speed, averaged over the last 15 seconds of cumulative totals. It appears only for live time ranges (not custom ranges) and resets when you switch backends, so it never shows negative or absurd values
+  - The traffic trend chart has a new Traffic / Speed toggle. Speed is the bytes in each time bucket divided by the bucket length. The newest bucket, which is still filling, is not plotted, so the right edge doesn't dip
+- **Export associated domains** ([#54], thanks @ron159 for the suggestion)
+  - Domain lists in the rule, proxy and device views, and in the IP expand panel, have an export button. It saves the full filtered and sorted list as a txt file with one domain per line, ready to paste into your own rule-set
+- **`LOG_LEVEL` environment variable** ([#80], thanks @ilupin for the suggestion)
+  - Accepts `error`, `warn`, `info` or `debug` (default `info`) and controls how much the collector process logs. `console.error` is always printed. Output from the container start script and Next.js is not affected
+
+### Agent (shipped as `agent-v1.4.8`)
+
+- **GitHub token for upgrades and installs** ([#77], thanks @8MiYile for the suggestion): with `GITHUB_TOKEN` (or `GITHUB_PAT`) set, `nekoagent upgrade` and `install.sh` send the token when they query the GitHub API, so anonymous rate limits no longer block them. The token goes only to `api.github.com`: it is never attached to binary downloads, never saved in instance config and never logged. A 401, 403 or 429 from the API now produces a clear error
+- Downloads and API requests now use a connect timeout, an overall timeout and retries
+
+[#54]: https://github.com/foru17/neko-master/issues/54
+[#77]: https://github.com/foru17/neko-master/issues/77
+[#80]: https://github.com/foru17/neko-master/issues/80
+[#93]: https://github.com/foru17/neko-master/issues/93
+
 ## [1.4.2] - 2026-10-09
 
 This release merges community bug-fix PRs and finishes the timezone part of #82. Thanks to @MaxwellChang98, @yafeishi, @heroixinu and @GodD6366.

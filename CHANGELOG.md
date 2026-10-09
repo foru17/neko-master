@@ -5,6 +5,30 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/spec/v2.0.0.html)。
 
+## [1.4.3] - 2026-10-09
+
+本版本补上几项被多次提到的小功能。
+
+### 新增
+
+- **实时网速与网速视图**（[#93]，感谢 @seth-shi 的建议）
+  - 总下载、总上传卡片下方显示当前网速，按最近 15 秒的累计流量平均计算。只在实时时间范围（非自定义范围）下显示，切换后端时会清零，不会出现负值或异常大的数值
+  - 流量趋势图新增"流量 / 网速"切换。网速 = 每个时间桶的字节数 ÷ 桶的秒数；还在累积中的最新时间桶不画，避免右端数值偏低
+- **导出关联域名**（[#54]，感谢 @ron159 的建议）
+  - 规则、代理、设备详情里的域名列表，以及 IP 展开面板，新增导出按钮。导出内容为当前筛选和排序下的完整列表，保存为 txt，一行一个域名，便于整理进自己的 rule-set
+- **`LOG_LEVEL` 环境变量**（[#80]，感谢 @ilupin 的建议）
+  - 可选 `error`、`warn`、`info`、`debug`，默认 `info`，用来控制采集器进程的日志量。`console.error` 永远输出；容器启动脚本和 Next.js 的输出不受影响
+
+### Agent（随 `agent-v1.4.8` 发布）
+
+- **升级与安装支持 GitHub token**（[#77]，感谢 @8MiYile 的建议）：设置 `GITHUB_TOKEN`（或 `GITHUB_PAT`）后，`nekoagent upgrade` 和 `install.sh` 查询 GitHub API 时会带上 token，避免匿名调用被限流。token 只用于 `api.github.com`，不会附加到二进制下载请求上，不写入实例配置，也不出现在日志里。API 返回 401、403 或 429 时会给出明确提示
+- 下载和 API 请求统一加上连接超时、总超时与重试
+
+[#54]: https://github.com/foru17/neko-master/issues/54
+[#77]: https://github.com/foru17/neko-master/issues/77
+[#80]: https://github.com/foru17/neko-master/issues/80
+[#93]: https://github.com/foru17/neko-master/issues/93
+
 ## [1.4.2] - 2026-10-09
 
 本版本合入社区提交的 bug 修复 PR，并补完 #82 的时区问题。感谢 @MaxwellChang98、@yafeishi、@heroixinu、@GodD6366。
