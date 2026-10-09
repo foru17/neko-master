@@ -100,7 +100,9 @@
     "upload": "上传",
     "tracked": "已追踪",
     "unavailable": "等待后端恢复",
-    "loadErrorTitle": "统计数据加载失败"
+    "loadErrorTitle": "统计数据加载失败",
+    "currentDownload": "当前下载速度",
+    "currentUpload": "当前上传速度"
   },
   "chart": {
     "trafficHistory": "流量趋势 (24小时)",
@@ -118,7 +120,10 @@
     "total": "总计",
     "noData": "暂无数据",
     "noDataHint": "可尝试切换更短时间范围，或等待新流量数据。",
-    "loading": "加载中..."
+    "loading": "加载中...",
+    "modeLabel": "图表模式",
+    "modeTraffic": "流量",
+    "modeSpeed": "网速"
   },
   "topDomains": {
     "title": "热门域名",
@@ -169,7 +174,6 @@
     "ipCount": "IP数",
     "proxy": "代理节点",
     "proxyTraffic": "代理节点流量明细",
-
     "domainsCount": "个域名",
     "showing": "显示",
     "of": "共",

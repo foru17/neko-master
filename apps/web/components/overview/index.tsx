@@ -296,6 +296,7 @@ export function OverviewTab({
       <TrafficTrendChart 
         data={trendData || []}
         granularity={trendGranularity}
+        bucketMinutes={trendQuery.bucketMinutes}
         timeRange={canUseTrendSelector ? trendTimeRange : undefined}
         timeRangeOptions={trendTimeOptions}
         onTimeRangeChange={canUseTrendSelector ? handleTimeRangeChange : undefined}

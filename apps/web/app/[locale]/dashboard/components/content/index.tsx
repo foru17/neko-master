@@ -22,6 +22,7 @@ import { InsightThreePanelSkeleton } from "@/components/ui/insight-skeleton";
 import { api, type TimeRange } from "@/lib/api";
 import { getDevicesQueryKey } from "@/lib/stats-query-keys";
 import { useStableTimeRange } from "@/lib/hooks/use-stable-time-range";
+import { useTransferRate } from "@/lib/transfer-rate";
 import { cn } from "@/lib/utils";
 import type { BackendStatus, TabId, TimePreset } from "@/lib/types/dashboard";
 import type {
@@ -71,6 +72,16 @@ const OverviewContent = memo(function OverviewContent({
   backendStatus: BackendStatus;
   isLoading?: boolean;
 }) {
+  // Live rate only makes sense while the window ends at "now" (issue #93);
+  // every preset except "custom" does.
+  const stableRange = useStableTimeRange(timeRange, { roundToMinute: true });
+  const isLiveWindow = autoRefresh && timePreset !== "custom";
+  const rate = useTransferRate(data?.totalDownload, data?.totalUpload, {
+    windowKey: `${stableRange?.start ?? ""}|${stableRange?.end ?? ""}`,
+    sourceKey: String(activeBackendId ?? ""),
+    enabled: isLiveWindow && !!activeBackendId,
+  });
+
   return (
     <div className="space-y-6">
       <StatsCards 
@@ -78,6 +89,7 @@ const OverviewContent = memo(function OverviewContent({
         error={error} 
         backendStatus={backendStatus} 
         isLoading={isLoading} 
+        rate={isLiveWindow ? rate : undefined}
       />
       <OverviewTab
         domains={data?.topDomains || []}

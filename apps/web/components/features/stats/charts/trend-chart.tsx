@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useRef } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import {
   AreaChart,
   Area,
@@ -14,15 +14,18 @@ import { Activity, Clock, BarChart3, Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { cn, formatBytes } from "@/lib/utils";
+import { cn, formatBytes, formatBytesPerSecond } from "@/lib/utils";
 import type { TrafficTrendPoint } from "@neko-master/shared";
 
 type TimeRange = "30m" | "1h" | "24h" | "today";
 type TrendGranularity = "minute" | "day";
+type TrendMode = "traffic" | "speed";
 
 interface TrafficTrendChartProps {
   data: TrafficTrendPoint[];
   granularity: TrendGranularity;
+  /** Bucket size of `data`, used to turn bytes per bucket into bytes/s. */
+  bucketMinutes?: number;
   timeRange?: TimeRange;
   timeRangeOptions?: TimeRange[];
   onTimeRangeChange?: (range: TimeRange) => void;
@@ -34,6 +37,7 @@ export const TrafficTrendChart = React.memo(
   function TrafficTrendChart({
     data,
     granularity,
+    bucketMinutes = 1,
     timeRange,
     timeRangeOptions = [],
     onTimeRangeChange,
@@ -42,6 +46,9 @@ export const TrafficTrendChart = React.memo(
   }: TrafficTrendChartProps) {
     const t = useTranslations("trend");
     const chartT = useTranslations("chart");
+    const [mode, setMode] = useState<TrendMode>("traffic");
+    const bucketSeconds = Math.max(60, Math.round(bucketMinutes * 60));
+    const formatValue = mode === "speed" ? formatBytesPerSecond : formatBytes;
     
     // Track if we've ever received data to avoid showing empty state on initial load
     const hasEverReceivedData = useRef(false);
@@ -101,15 +108,16 @@ export const TrafficTrendChart = React.memo(
                 minute: "2-digit",
                 hour12: false,
               });
+        const scale = mode === "speed" ? bucketSeconds : 1;
         return {
           time: point.time,
-          download: point.download,
-          upload: point.upload,
+          download: point.download / scale,
+          upload: point.upload / scale,
           timeLabel,
           timestamp: date.getTime(), // for sorting/debugging
         };
       });
-    }, [data, granularity]);
+    }, [data, granularity, mode, bucketSeconds]);
 
     // Custom tooltip - show local time
     const CustomTooltip = React.useCallback(
@@ -144,7 +152,7 @@ export const TrafficTrendChart = React.memo(
                     {chartT("download")}:
                   </span>
                   <span className="font-medium tabular-nums">
-                    {formatBytes(dataPoint.download)}
+                    {formatValue(dataPoint.download)}
                   </span>
                 </p>
                 <p className="text-sm flex items-center gap-2">
@@ -153,14 +161,14 @@ export const TrafficTrendChart = React.memo(
                     {chartT("upload")}:
                   </span>
                   <span className="font-medium tabular-nums">
-                    {formatBytes(dataPoint.upload)}
+                    {formatValue(dataPoint.upload)}
                   </span>
                 </p>
                 <p className="text-sm flex items-center gap-2 pt-1 border-t border-border/50 mt-1">
                   <span className="w-2 h-2 rounded-full bg-transparent" />
                   <span className="text-muted-foreground">{t("total")}:</span>
                   <span className="font-semibold tabular-nums">
-                    {formatBytes(dataPoint.download + dataPoint.upload)}
+                    {formatValue(dataPoint.download + dataPoint.upload)}
                   </span>
                 </p>
               </div>
@@ -169,7 +177,7 @@ export const TrafficTrendChart = React.memo(
         }
         return null;
       },
-      [chartT, t, granularity],
+      [chartT, t, granularity, formatValue],
     );
 
     // Loading skeleton - show when loading or on initial load with no data yet
@@ -256,6 +264,28 @@ export const TrafficTrendChart = React.memo(
             </CardTitle>
 
             <div className="flex items-center gap-2">
+              <div
+                role="radiogroup"
+                aria-label={t("modeLabel")}
+                className="flex items-center gap-0.5 bg-muted/50 rounded-lg p-0.5">
+                {(["traffic", "speed"] as const).map((option) => (
+                  <Button
+                    key={option}
+                    variant="ghost"
+                    size="sm"
+                    role="radio"
+                    aria-checked={mode === option}
+                    className={cn(
+                      "h-7 px-3 text-xs rounded-md transition-all",
+                      mode === option
+                        ? "bg-background shadow-sm text-primary font-medium"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                    onClick={() => setMode(option)}>
+                    {option === "traffic" ? t("modeTraffic") : t("modeSpeed")}
+                  </Button>
+                ))}
+              </div>
               <div className={selectorSlotClassName}>
                 {showTimeRangeSelector ? (
                   <div className="flex items-center gap-0.5 bg-muted/50 rounded-lg p-0.5">
@@ -393,9 +423,9 @@ export const TrafficTrendChart = React.memo(
                     tickLine={false}
                     tick={{ fontSize: 10, fill: "#888888" }}
                     tickFormatter={(value) =>
-                      formatBytes(value).replace(" ", "")
+                      formatValue(value).replace(" ", "")
                     }
-                    width={50}
+                    width={mode === "speed" ? 62 : 50}
                   />
                   <Tooltip content={<CustomTooltip />} />
                   <Area
@@ -439,6 +469,7 @@ export const TrafficTrendChart = React.memo(
     return (
       JSON.stringify(prev.data) === JSON.stringify(next.data) &&
       prev.granularity === next.granularity &&
+      prev.bucketMinutes === next.bucketMinutes &&
       prev.timeRange === next.timeRange &&
       JSON.stringify(prev.timeRangeOptions) ===
         JSON.stringify(next.timeRangeOptions) &&

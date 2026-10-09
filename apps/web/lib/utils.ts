@@ -72,3 +72,7 @@ export function formatDuration(dateString: string): string {
   if (minutes > 0) return `${minutes}m ago`;
   return `${seconds}s ago`;
 }
+
+export function formatBytesPerSecond(bytesPerSecond: number): string {
+  return `${formatBytes(bytesPerSecond)}/s`;
+}

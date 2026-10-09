@@ -100,7 +100,9 @@
     "upload": "Upload",
     "tracked": "tracked",
     "unavailable": "Waiting for backend",
-    "loadErrorTitle": "Failed to load statistics"
+    "loadErrorTitle": "Failed to load statistics",
+    "currentDownload": "Current download speed",
+    "currentUpload": "Current upload speed"
   },
   "chart": {
     "trafficHistory": "Traffic History (24h)",
@@ -118,7 +120,10 @@
     "total": "Total",
     "noData": "No data",
     "noDataHint": "Try switching to a shorter range or wait for new traffic.",
-    "loading": "Loading..."
+    "loading": "Loading...",
+    "modeLabel": "Chart mode",
+    "modeTraffic": "Traffic",
+    "modeSpeed": "Speed"
   },
   "topDomains": {
     "title": "Top Domains",
@@ -170,7 +175,6 @@
     "ipCount": "IPs",
     "proxy": "Proxy",
     "proxyTraffic": "Proxy Traffic Breakdown",
-
     "domainsCount": "domains",
     "showing": "Showing",
     "of": "of",

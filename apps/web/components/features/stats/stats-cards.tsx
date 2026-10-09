@@ -4,7 +4,8 @@ import { useRef, useEffect } from "react";
 import { Download, Upload, Globe, Activity, Server, Route, AlertTriangle } from "lucide-react";
 import { useTranslations, useLocale } from "next-intl";
 import { animate, motion, useTransform, useMotionValue } from "framer-motion";
-import { formatBytes, cn } from "@/lib/utils";
+import { formatBytes, formatBytesPerSecond, cn } from "@/lib/utils";
+import type { TransferRate } from "@/lib/transfer-rate";
 import type { StatsSummary } from "@neko-master/shared";
 
 interface StatsCardsProps {
@@ -12,6 +13,8 @@ interface StatsCardsProps {
   error?: string | null;
   backendStatus?: "healthy" | "unhealthy" | "unknown";
   isLoading?: boolean;
+  /** Live rate for the latest window; undefined hides the rate line. */
+  rate?: TransferRate | null;
 }
 
 // ---------- Animated number display ----------
@@ -76,7 +79,7 @@ function AnimatedStatCard({
   value: number;
   formatter: (n: number) => string;
   label: string;
-  subvalue?: string;
+  subvalue?: React.ReactNode;
   icon: React.ElementType;
   color: string;
 }) {
@@ -98,7 +101,7 @@ function AnimatedStatCard({
           title={formatter(value)}
         />
         {subvalue && (
-          <p className="text-base text-muted-foreground mt-1.5 truncate">
+          <p className="text-[11px] text-muted-foreground mt-1.5 truncate tabular-nums">
             {subvalue}
           </p>
         )}
@@ -109,7 +112,23 @@ function AnimatedStatCard({
 
 // ---------- Main ----------
 
-export function StatsCards({ data, backendStatus, isLoading, error }: StatsCardsProps) {
+function RateLine({ value, label }: { value: number | null; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5" title={label}>
+      <span
+        aria-hidden
+        className={cn(
+          "w-1.5 h-1.5 rounded-full",
+          value === null ? "bg-muted-foreground/40" : "bg-emerald-500 dark:bg-emerald-400",
+        )}
+      />
+      <span className="sr-only">{label}: </span>
+      {value === null ? "—" : formatBytesPerSecond(value)}
+    </span>
+  );
+}
+
+export function StatsCards({ data, backendStatus, isLoading, error, rate }: StatsCardsProps) {
   const t = useTranslations("stats");
   const locale = useLocale();
   const formatCount = (n: number) => n.toLocaleString(locale);
@@ -207,6 +226,11 @@ export function StatsCards({ data, backendStatus, isLoading, error }: StatsCards
             formatter={formatBytes}
             icon={Download}
             label={t("totalDownload")}
+            subvalue={
+              rate !== undefined ? (
+                <RateLine value={rate?.download ?? null} label={t("currentDownload")} />
+              ) : undefined
+            }
             color="#3B82F6"
           />
           <AnimatedStatCard
@@ -214,6 +238,11 @@ export function StatsCards({ data, backendStatus, isLoading, error }: StatsCards
             formatter={formatBytes}
             icon={Upload}
             label={t("totalUpload")}
+            subvalue={
+              rate !== undefined ? (
+                <RateLine value={rate?.upload ?? null} label={t("currentUpload")} />
+              ) : undefined
+            }
             color="#8B5CF6"
           />
           <AnimatedStatCard
