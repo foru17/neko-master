@@ -14,6 +14,7 @@ services:
       - ./geoip:/app/data/geoip:ro
     environment:
       - NODE_ENV=production
+      - LOG_LEVEL=${LOG_LEVEL:-info}
       - WEB_PORT=3000
       - API_PORT=3001
       - COLLECTOR_WS_PORT=3002

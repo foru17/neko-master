@@ -1,16 +1,6 @@
-import { config } from 'dotenv';
+import './shared/utils/initialize-logger.js';
 import path from 'path';
-import fs from 'fs';
 import { isAgentBackendUrl } from '@neko-master/shared';
-
-// Load .env.local if it exists (takes precedence over .env, but not shell)
-const envLocalPath = path.join(process.cwd(), '.env.local');
-if (fs.existsSync(envLocalPath)) {
-  config({ path: envLocalPath, quiet: true });
-}
-
-// Load .env (defaults)
-config({ quiet: true });
 
 import { StatsDatabase, BackendConfig } from './modules/db/db.js';
 import { createCollector, GatewayCollector } from './modules/collector/gateway.collector.js';

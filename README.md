@@ -419,6 +419,7 @@ The script will automatically detect and suggest available ports.
 | `API_URL` | `http://localhost:3001` | Next.js `/api` rewrite target (mainly source/custom builds) | API listen address changed |
 | `COOKIE_SECRET` | auto-generated | Cookie signing secret; if not fixed, sessions can be invalidated after restart when data dir is not persisted | Strongly recommended in production |
 | `AGENT_HEARTBEAT_TIMEOUT_MS` | `90000` | How long (ms, minimum `15000`) an agent may go without a heartbeat/report before it is shown offline (backend list, health checks, manual test). Defaults to 3 × the agent's 30s heartbeat interval | Agents flap online/offline on slow links |
+| `LOG_LEVEL` | `info` | Collector log level: `error`, `warn`, `info`, or `debug` (case-insensitive); `console.error` is always emitted | Reduce collector log volume or enable debug output |
 | `BACKEND_TLS_INSECURE` | empty | Set to `1` to skip TLS certificate verification for gateway APIs only (Surge `http-api-tls`, mihomo `external-controller-tls` with self-signed certs). Logs a warning at startup | Gateway uses HTTPS with a self-signed / IP-mismatched certificate |
 | `GEOIP_LOOKUP_PROVIDER` | `online` | IP geolocation source (`online` / `local`) | Default to local MMDB lookup |
 | `GEOIP_ONLINE_API_URL` | `https://api.ipinfo.es/ipinfo` | Online IP geolocation API endpoint (must be compatible with `ipinfo.my` response schema) | Set only when you deploy a compatible endpoint |
