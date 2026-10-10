@@ -34,7 +34,7 @@ pnpm --filter @neko-master/web exec next build
 git push origin main
 git tag -a vX.Y.Z -m "<one-line summary>"
 git push origin vX.Y.Z
-gh release create vX.Y.Z --title "vX.Y.Z" --notes "<highlights + upgrade notes>"
+gh release create vX.Y.Z --title "vX.Y.Z" --notes-file notes.md   # English only, see Conventions
 ```
 
 6. **Verify CI**: `gh run list --limit 3` → the tag-branch "Build and Push Docker Image" run must end `completed/success`. Multi-arch builds can exceed 20 minutes; poll rather than assume.
@@ -53,5 +53,6 @@ Keep `AgentProtocolVersion` (Go, `internal/config/config.go`) and the collector'
 ## Conventions
 
 - Also check `docs/release-checklist.md` (pre-release validation for combined product+agent releases).
+- **GitHub release notes are written in English** (title + body), like every release up to v1.3.10. Derive them from the `CHANGELOG.en.md` section, never from the Chinese `CHANGELOG.md`; Chinese belongs only in `CHANGELOG.md`. Check before publishing: `grep -P '\p{Han}' notes.md` must print nothing.
 - Upgrade notes in the release body must call out any automatic startup migration so operators aren't surprised by one-time log output.
 - Commit messages follow conventional-commit style (`fix(scope): ...`, `release: vX.Y.Z — ...`).
