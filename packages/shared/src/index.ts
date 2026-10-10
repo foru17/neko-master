@@ -105,6 +105,12 @@ export interface DeviceStats {
   totalDownload: number;
   totalConnections: number;
   lastSeen: string;
+  /** Optional operator-supplied friendly name; takes precedence over sourceIP in the UI. */
+  alias?: string;
+  /** Optional hostname associated with sourceIP (e.g. from DHCP leases). */
+  hostname?: string;
+  /** Optional MAC address associated with sourceIP. */
+  mac?: string;
 }
 
 export interface RuleStats {

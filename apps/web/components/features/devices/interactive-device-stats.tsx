@@ -97,16 +97,27 @@ export function InteractiveDeviceStats({
 
   const chartData = useMemo(() => {
     if (!data) return [];
-    return data.map((device, index) => ({
-      name: device.sourceIP,
-      rawName: device.sourceIP,
-      value: device.totalDownload + device.totalUpload,
-      download: device.totalDownload,
-      upload: device.totalUpload,
-      connections: device.totalConnections,
-      color: COLORS[index % COLORS.length],
-      rank: index,
-    }));
+    return data.map((device, index) => {
+      // Prefer operator-supplied friendly names (alias > hostname > sourceIP).
+      // The three optional fields are an extension point — they may be filled
+      // by a sidecar in front of the collector that maps sourceIP to a
+      // hostname from a DHCP lease, a static alias, etc.
+      const alias = (device as DeviceStats & { alias?: string }).alias;
+      const hostname = (device as DeviceStats & { hostname?: string }).hostname;
+      const display = alias || hostname || device.sourceIP;
+      return {
+        name: display,
+        rawName: device.sourceIP,
+        alias: alias || "",
+        hostname: hostname || "",
+        value: device.totalDownload + device.totalUpload,
+        download: device.totalDownload,
+        upload: device.totalUpload,
+        connections: device.totalConnections,
+        color: COLORS[index % COLORS.length],
+        rank: index,
+      };
+    });
   }, [data]);
 
   const totalTraffic = useMemo(
