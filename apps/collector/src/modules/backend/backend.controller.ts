@@ -2,7 +2,8 @@
  * Backend Controller - Fastify routes for /api/backends
  */
 
-import type { FastifyInstance, FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
+import { errorCodes } from 'fastify';
+import type { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import type { BackendService } from './backend.service.js';
 import type {
   CreateBackendInput,
@@ -102,20 +103,86 @@ const backendController: FastifyPluginAsync = async (fastify: FastifyInstance): 
     return result;
   });
 
-  // Set active backend
-  fastify.post<{ Params: BackendParams }>('/:id/activate', async (request, reply) => {
-    // fastify.authService.isShowcaseMode() check removed to allow switching in demo mode
+  // A proxy can forward an empty HTTP/2 request as chunked HTTP/1.1, without
+  // a Content-Type. Scope the parser to endpoints that do not require a body.
+  await fastify.register(async (bodylessRoutes) => {
+    bodylessRoutes.addContentTypeParser('*', { parseAs: 'buffer' }, (request, body, done) => {
+      if (request.headers['content-type'] === undefined && body.length === 0) {
+        done(null, undefined);
+        return;
+      }
+      done(new errorCodes.FST_ERR_CTP_INVALID_MEDIA_TYPE());
+    });
 
-    const { id } = request.params;
-    const backendId = parseInt(id);
-    
-    const backend = service.getBackend(backendId);
-    if (!backend) {
-      return reply.status(404).send({ error: 'Backend not found' });
-    }
-    
-    const result = service.setActiveBackend(backendId);
-    return result;
+    // Set active backend
+    bodylessRoutes.post<{ Params: BackendParams }>('/:id/activate', async (request, reply) => {
+      // fastify.authService.isShowcaseMode() check removed to allow switching in demo mode
+
+      const { id } = request.params;
+      const backendId = parseInt(id);
+
+      const backend = service.getBackend(backendId);
+      if (!backend) {
+        return reply.status(404).send({ error: 'Backend not found' });
+      }
+
+      const result = service.setActiveBackend(backendId);
+      return result;
+    });
+
+    // Test existing backend connection (uses stored token)
+    bodylessRoutes.post<{ Params: BackendParams }>('/:id/test', async (request, reply) => {
+      if (fastify.authService.isShowcaseMode()) {
+        return reply.status(403).send({ error: 'Forbidden' });
+      }
+
+      const { id } = request.params;
+      const backendId = parseInt(id);
+
+      const backend = service.getBackend(backendId);
+      if (!backend) {
+        return reply.status(404).send({ error: 'Backend not found' });
+      }
+
+      const result = await service.testExistingBackendConnection(backendId);
+      return result;
+    });
+
+    // Rotate agent token for a backend
+    bodylessRoutes.post<{ Params: BackendParams }>('/:id/rotate-agent-token', async (request, reply) => {
+      if (fastify.authService.isShowcaseMode()) {
+        return reply.status(403).send({ error: 'Forbidden' });
+      }
+
+      const { id } = request.params;
+      const backendId = parseInt(id);
+
+      const backend = service.getBackend(backendId);
+      if (!backend) {
+        return reply.status(404).send({ error: 'Backend not found' });
+      }
+
+      const result = service.rotateAgentToken(backendId);
+      return result;
+    });
+
+    // Clear all data for a specific backend
+    bodylessRoutes.post<{ Params: BackendParams }>('/:id/clear-data', async (request, reply) => {
+      if (fastify.authService.isShowcaseMode()) {
+        return reply.status(403).send({ error: 'Forbidden' });
+      }
+
+      const { id } = request.params;
+      const backendId = parseInt(id);
+
+      const backend = service.getBackend(backendId);
+      if (!backend) {
+        return reply.status(404).send({ error: 'Backend not found' });
+      }
+
+      const result = await service.clearBackendData(backendId);
+      return result;
+    });
   });
 
   // Set listening state for a backend
@@ -134,42 +201,6 @@ const backendController: FastifyPluginAsync = async (fastify: FastifyInstance): 
     }
     
     const result = service.setBackendListening(backendId, listening);
-    return result;
-  });
-
-  // Test existing backend connection (uses stored token)
-  fastify.post<{ Params: BackendParams }>('/:id/test', async (request, reply) => {
-    if (fastify.authService.isShowcaseMode()) {
-      return reply.status(403).send({ error: 'Forbidden' });
-    }
-
-    const { id } = request.params;
-    const backendId = parseInt(id);
-    
-    const backend = service.getBackend(backendId);
-    if (!backend) {
-      return reply.status(404).send({ error: 'Backend not found' });
-    }
-
-    const result = await service.testExistingBackendConnection(backendId);
-    return result;
-  });
-
-  // Rotate agent token for a backend
-  fastify.post<{ Params: BackendParams }>('/:id/rotate-agent-token', async (request, reply) => {
-    if (fastify.authService.isShowcaseMode()) {
-      return reply.status(403).send({ error: 'Forbidden' });
-    }
-
-    const { id } = request.params;
-    const backendId = parseInt(id);
-
-    const backend = service.getBackend(backendId);
-    if (!backend) {
-      return reply.status(404).send({ error: 'Backend not found' });
-    }
-
-    const result = service.rotateAgentToken(backendId);
     return result;
   });
 
@@ -204,23 +235,6 @@ const backendController: FastifyPluginAsync = async (fastify: FastifyInstance): 
     },
   );
 
-  // Clear all data for a specific backend
-  fastify.post<{ Params: BackendParams }>('/:id/clear-data', async (request, reply) => {
-    if (fastify.authService.isShowcaseMode()) {
-      return reply.status(403).send({ error: 'Forbidden' });
-    }
-
-    const { id } = request.params;
-    const backendId = parseInt(id);
-    
-    const backend = service.getBackend(backendId);
-    if (!backend) {
-      return reply.status(404).send({ error: 'Backend not found' });
-    }
-    
-    const result = await service.clearBackendData(backendId);
-    return result;
-  });
 };
 
 export default backendController;
