@@ -8,7 +8,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { enUS, zhCN } from "date-fns/locale";
+import { enUS, ru, zhCN } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
@@ -138,8 +138,16 @@ export function TimeRangePicker({
 }: TimeRangePickerProps) {
   const locale = useLocale();
   const t = useTranslations("timeRangePicker");
-  const localeCode = locale.startsWith("zh") ? "zh-CN" : "en-US";
-  const calendarLocale = locale.startsWith("zh") ? zhCN : enUS;
+  const localeCode = locale.startsWith("zh")
+    ? "zh-CN"
+    : locale.startsWith("ru")
+      ? "ru-RU"
+      : "en-US";
+  const calendarLocale = locale.startsWith("zh")
+    ? zhCN
+    : locale.startsWith("ru")
+      ? ru
+      : enUS;
   const showDebugShortPresets = process.env.NODE_ENV !== "production";
   const showShortPresetInProduction = (
     preset: Extract<PresetType, "1m" | "5m" | "15m" | "30m">,

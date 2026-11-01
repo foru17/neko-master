@@ -543,6 +543,18 @@ export function Header({
                 >
                   中文 {locale === "zh" && "✓"}
                 </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    const newPathname = pathname.replace(
+                      `/${locale}`,
+                      "/ru"
+                    );
+                    onNavigate(newPathname);
+                  }}
+                  className={locale === "ru" ? "bg-muted" : ""}
+                >
+                  Русский {locale === "ru" && "✓"}
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
 
                 {/* Settings */}
