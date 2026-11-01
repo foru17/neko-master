@@ -349,7 +349,8 @@
   "language": {
     "select": "选择语言",
     "en": "English",
-    "zh": "中文"
+    "zh": "中文",
+    "ru": "Русский"
   },
   "auth": {
     "loginTitle": "安全登录",

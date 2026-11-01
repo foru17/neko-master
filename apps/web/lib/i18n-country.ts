@@ -5,11 +5,11 @@ import { useMemo } from "react";
 
 // Special non-ISO codes used in this app
 const SPECIAL_NAMES: Record<string, Record<string, string>> = {
-  LOCAL: { en: "Local", zh: "本地" },
-  DIRECT: { en: "Direct", zh: "直连" },
-  UNKNOWN: { en: "Unknown", zh: "未知" },
-  PRIVATE: { en: "Private", zh: "私有" },
-  RESERVED: { en: "Reserved", zh: "保留" },
+  LOCAL: { en: "Local", zh: "本地", ru: "Локальная сеть" },
+  DIRECT: { en: "Direct", zh: "直连", ru: "Напрямую" },
+  UNKNOWN: { en: "Unknown", zh: "未知", ru: "Неизвестно" },
+  PRIVATE: { en: "Private", zh: "私有", ru: "Приватная сеть" },
+  RESERVED: { en: "Reserved", zh: "保留", ru: "Зарезервированная сеть" },
 };
 
 // Override CLDR defaults for specific regions to ensure consistent display
@@ -23,6 +23,7 @@ const REGION_OVERRIDES: Record<string, Record<string, string>> = {
 const localeMap: Record<string, string> = {
   zh: "zh-Hans",
   en: "en",
+  ru: "ru",
 };
 
 function createDisplayNames(locale: string): Intl.DisplayNames | null {
