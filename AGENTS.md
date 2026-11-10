@@ -53,7 +53,7 @@ apps/collector/src/
 apps/web/
   lib/api.ts, lib/websocket.ts           # HTTP client + stats WS hook (backendId-tagged pushes)
   lib/stats-query-keys.ts                # centralized React Query keys
-  messages/{zh,en}.json                  # i18n — every key in BOTH files
+  messages/{zh,en,ru}.json               # i18n — every key in zh + en; ru is community (falls back to en)
   components/features/                   # domain components (rules/, countries/, backend/, stats/)
   app/[locale]/dashboard/                # main dashboard route
 apps/agent/
@@ -71,7 +71,7 @@ docs/
 2. **One traffic write path**: `batchUpdateTrafficStats`, one atomic outer transaction. Never add a parallel write implementation.
 3. **Schema changes are multi-registry**: schema.ts + migration + retention + `deleteBackendData` + ClickHouse writer/reader parity + shared types (checklist: `add-stats-dimension` skill).
 4. **CSV column dedup** uses the delimiter-aware `INSTR(','||col||',', ','||@v||',')` pattern — never bare `INSTR`.
-5. **i18n + dark mode**: every user-facing string in both `messages/{zh,en}.json`; every light-palette Tailwind class has a `dark:` counterpart; inline SVG/chart colors switch on `resolvedTheme`.
+5. **i18n + dark mode**: every user-facing string in both `messages/{zh,en}.json` (community locales such as `ru.json` are best-effort; missing keys fall back to English in `i18n/request.ts`); every light-palette Tailwind class has a `dark:` counterpart; inline SVG/chart colors switch on `resolvedTheme`.
 6. **Agent protocol**: payload changes bump `AgentProtocolVersion` (Go) and the collector's minimum in the same commit.
 
 ## Environment and Toolchain
@@ -203,8 +203,8 @@ docs/
 - Prefer React Query hooks for server state and caching.
 - Keep API contract types aligned with `@neko-master/shared` and `apps/web/lib/api.ts`.
 - Reuse shared utility helpers (`cn`, formatting utilities) instead of ad-hoc duplicates.
-- **i18n**: uses `next-intl` with two locales (`zh` default, `en`).
-  - Translation files: `apps/web/messages/{zh,en}.json`.
+- **i18n**: uses `next-intl` with `zh` (default), `en`, and community-maintained `ru`.
+  - Translation files: `apps/web/messages/{zh,en,ru}.json`. Non-English locales are deep-merged over `en.json`, so a key missing from a community locale renders in English.
   - Routing config: `apps/web/i18n/routing.ts`.
   - Use `useTranslations('namespace')` in components; never hardcode user-facing strings.
 - **UI components**: shadcn/ui (`new-york` style) + Tailwind CSS v4 + `lucide-react` icons.

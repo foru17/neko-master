@@ -541,8 +541,10 @@
       "forceOffWarningDescription": "Authentication is forced off via environment variable. You can reset your password without providing the current one.",
       "emergencyResetTitle": "Confirm Token Reset",
       "emergencyResetDescription": "You are currently in Emergency Access Mode. After resetting the token, the old one will be invalid.",
-      "emergencyResetWarning": "For your security, please remove the backend environment variable FORCE_ACCESS_CONTROL_OFF and restart the service after the reset is complete."
-    }
+      "emergencyResetWarning": "For your security, please remove the backend environment variable FORCE_ACCESS_CONTROL_OFF and restart the service after the reset is complete.",
+      "invalidToken": "Token must be at least 6 characters and include letters and numbers"
+    },
+    "clearBackendDataError": "Failed to clear backend data"
   },
   "health": {
     "title": "Node Health",

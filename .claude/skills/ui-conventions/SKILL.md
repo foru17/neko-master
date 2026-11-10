@@ -7,7 +7,7 @@ description: Frontend change conventions for apps/web — i18n (bilingual keys),
 
 ## i18n — every user-facing string, both locales
 
-- Framework: `next-intl`, locales `zh` (default) and `en`. Message files: `apps/web/messages/{zh,en}.json` — a key added to one file MUST be added to the other in the same commit.
+- Framework: `next-intl`, locales `zh` (default), `en`, and community-maintained `ru`. Message files: `apps/web/messages/{zh,en,ru}.json` — a key added to zh or en MUST be added to the other in the same commit; add it to `ru.json` when you can (missing ru keys fall back to English via `i18n/request.ts`).
 - Components use `useTranslations('namespace')`. Never hardcode user-facing strings — including chart tooltips, `title` attributes, and aria-labels (historically the most-missed spots).
 - Utility functions that produce display text (`formatDuration` style) must not embed English words; return structured data and translate in the component.
 

@@ -541,8 +541,10 @@
       "forceOffWarningDescription": "通过环境变量强制关闭了访问控制。您可以在不提供当前令牌的情况下重置令牌。",
       "emergencyResetTitle": "确认重置访问令牌",
       "emergencyResetDescription": "当前处于紧急访问模式。重置密码后，旧的令牌将失效。",
-      "emergencyResetWarning": "为了您的面板安全，请在重置完成后，务必删除后端环境变量 FORCE_ACCESS_CONTROL_OFF 并重启服务。"
-    }
+      "emergencyResetWarning": "为了您的面板安全，请在重置完成后，务必删除后端环境变量 FORCE_ACCESS_CONTROL_OFF 并重启服务。",
+      "invalidToken": "令牌至少 6 位，且需同时包含字母和数字"
+    },
+    "clearBackendDataError": "清除后端数据失败"
   },
   "health": {
     "title": "节点健康",
