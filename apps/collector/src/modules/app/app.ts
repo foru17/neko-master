@@ -336,11 +336,17 @@ export async function createApp(options: AppOptions) {
 
   // Create services
   const authService = new AuthService(db);
+  // Clearing or deleting a backend must also drop agent traffic still waiting
+  // in the batch buffer; otherwise the next flush writes it back.
+  const handleBackendDataCleared = (backendId: number) => {
+    clearAgentRuntimeState(backendId);
+    onBackendDataCleared?.(backendId);
+  };
   const backendService = new BackendService(
     db,
     realtimeStore,
     authService,
-    onBackendDataCleared,
+    handleBackendDataCleared,
   );
   const statsService = new StatsService(db, realtimeStore);
 
@@ -353,7 +359,7 @@ export async function createApp(options: AppOptions) {
   app.decorate('clearAgentRuntimeState', clearAgentRuntimeState);
   app.decorate(
     'notifyBackendDataCleared',
-    (backendId: number) => onBackendDataCleared?.(backendId),
+    handleBackendDataCleared,
   );
 
   const getBackendIdFromQuery = (query: Record<string, unknown>): number | null => {
