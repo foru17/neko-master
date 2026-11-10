@@ -33,7 +33,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // We use useLogout logic but inside provider
   const { mutate: logoutMutate } = useMutation({
     mutationFn: async () => {
-       await fetch("/api/auth/logout", { method: "POST" });
+       await fetch("/api/auth/logout", {
+         method: "POST",
+         headers: { "Content-Type": "application/json" },
+         body: "{}",
+       });
     },
     onSuccess: () => {
       setIsAuthenticated(false);

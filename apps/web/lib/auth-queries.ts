@@ -77,7 +77,11 @@ export function useLogout() {
 
   return useMutation({
     mutationFn: async () => {
-      await fetch("/api/auth/logout", { method: "POST" });
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
     },
     onSuccess: () => {
       // Invalidate and refetch auth state
