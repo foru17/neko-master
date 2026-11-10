@@ -7,9 +7,12 @@ const ROOT = process.cwd();
 
 const FRONTEND_API_FILE = path.join(ROOT, 'apps/web/lib/api.ts');
 const BACKEND_SOURCES = [
-  { file: 'apps/collector/src/app.ts', prefix: '' },
+  // Prefixes must match the app.register(..., { prefix }) calls in app.ts.
+  { file: 'apps/collector/src/modules/app/app.ts', prefix: '' },
   { file: 'apps/collector/src/modules/stats/stats.controller.ts', prefix: '/api/stats' },
   { file: 'apps/collector/src/modules/backend/backend.controller.ts', prefix: '/api/backends' },
+  { file: 'apps/collector/src/modules/auth/auth.controller.ts', prefix: '/api/auth' },
+  { file: 'apps/collector/src/modules/config/config.controller.ts', prefix: '/api/db' },
 ];
 
 function read(file) {
@@ -39,7 +42,8 @@ function extractFrontendRoutes(code) {
 
 function extractBackendRoutes(code, prefix) {
   const routes = new Set();
-  const routePattern = /(?:app|fastify)\.(?:get|post|put|delete)(?:<[^>\n\r]*>)?\(\s*['"]([^'"]+)['"]/g;
+  // Any Fastify instance or child scope (app, fastify, bodylessRoutes, ...).
+  const routePattern = /\b[A-Za-z_$][\w$]*\.(?:get|post|put|delete)(?:<[^>\n\r]*>)?\(\s*['"]([^'"]+)['"]/g;
 
   for (const match of code.matchAll(routePattern)) {
     const raw = `${prefix}${match[1]}`;
