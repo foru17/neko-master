@@ -260,6 +260,11 @@ export function createCollector(
   const id = backendId || 0;
   const activeConnections = new Map<string, TrackedConnection>();
   const startedAt = Date.now();
+  // Time of the last connection snapshot we processed. Staleness is measured
+  // against it, not the wall clock: while the gateway link is down no
+  // snapshots arrive, and evicting still-open connections then would make the
+  // first snapshot after reconnect re-count their cumulative bytes.
+  let lastSnapshotAt = startedAt;
   const batchBuffer = new BatchBuffer();
   let lastBroadcastTime = 0;
   const broadcastThrottleMs = 500;
@@ -275,10 +280,9 @@ export function createCollector(
 
   // Clean up stale connections that haven't been updated for a while
   const cleanupStaleConnections = () => {
-    const now = Date.now();
     let cleaned = 0;
     for (const [connId, conn] of activeConnections) {
-      if (now - conn.lastSeen > STALE_CONNECTION_TIMEOUT) {
+      if (lastSnapshotAt - conn.lastSeen > STALE_CONNECTION_TIMEOUT) {
         activeConnections.delete(connId);
         cleaned++;
       }
@@ -443,6 +447,7 @@ export function createCollector(
       }
 
       const now = Date.now();
+      lastSnapshotAt = now;
       const currentIds = new Set(
         data.connections.map((c) => c?.id).filter(Boolean),
       );

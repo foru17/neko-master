@@ -252,6 +252,12 @@ export function createSurgeCollector(
   const activeRequests = new Map<string, TrackedRequest>();
   const batchBuffer = new BatchBuffer();
   const startedAt = Date.now();
+  // Time of the last request snapshot we processed. Staleness and the
+  // completed-request TTL are measured against it, not the wall clock: while
+  // Surge is unreachable no snapshots arrive, and expiring tracked requests
+  // then would make the first snapshot after reconnect re-count their
+  // cumulative bytes.
+  let lastSnapshotAt = startedAt;
 
   // Track recently completed requests to prevent double counting
   // Key: request ID, Value: completion timestamp
@@ -274,7 +280,7 @@ export function createSurgeCollector(
 
   // Clean up stale connections that haven't been updated for a while
   const cleanupStaleConnections = () => {
-    const now = Date.now();
+    const now = lastSnapshotAt;
     let cleaned = 0;
     for (const [reqId, req] of activeRequests) {
       if (now - req.lastSeen > STALE_CONNECTION_TIMEOUT) {
@@ -449,6 +455,7 @@ export function createSurgeCollector(
       }
 
       const now = Date.now();
+      lastSnapshotAt = now;
       const currentIds = new Set(
         data.requests.map((r) => r?.id).filter(Boolean)
       );
