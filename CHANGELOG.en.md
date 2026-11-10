@@ -5,6 +5,47 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.4] - 2026-11-11
+
+This release merges three community PRs and fixes two statistics bugs: double counting after a gateway outage, and older short ranges showing zero. Thanks to @seth-shi, @glwlg and @axel36rus.
+
+### Added
+
+- **Russian UI** (PR [#104], thanks @axel36rus)
+  - New `/ru` locale, selectable as "Русский" in the language menu. Strings a community locale has not translated yet fall back to English instead of showing raw keys
+
+### Fixed
+
+- **415 errors when switching, testing or clearing a backend behind Cloudflare Tunnel or similar proxies** (PR [#100], [#103], thanks @seth-shi and @glwlg) 🐛
+  - The tunnel turns a bodyless POST into a chunked request, and Fastify rejected it without a Content-Type. The four bodyless endpoints (activate, test, rotate agent token, clear data) now accept empty requests, and the web app sends an empty JSON body on every bodyless POST/PUT, including logout
+- **Long-lived connections counted twice after a gateway outage longer than 5 minutes** 🐛
+  - During an outage the stale-connection sweep evicted still-open connections by wall-clock time; the first snapshot after reconnect treated them as new and counted their cumulative bytes again (a 5 GB download was recorded as 10 GB). Staleness is now measured against the last received snapshot, so nothing is evicted while the gateway is unreachable. Fixed for both mihomo and Surge collection
+- **Custom ranges of 6 hours or less older than 7 days showed all zeros** 🐛
+  - Short ranges always read the minute tables, which only keep the last 7 days (`SQLITE_RETENTION_MINUTE_DAYS`). Ranges that start before the minute retention now read the hourly tables (also when auto-cleanup is off, so such ranges show hourly granularity)
+- **Traffic trends longer than 6 hours were shifted when `TZ` was not UTC** 🐛: stored time keys were parsed as local time; they are now parsed as UTC
+- **The current point of the traffic trend appeared twice in ClickHouse mode** 🐛: ClickHouse returned space-separated times that did not match the realtime keys; all trend times now use the `T` separator
+- **Agent traffic still buffered was written back after clearing or deleting a backend**: the agent buffer is now dropped as well
+- The error toast for changing the access token or clearing a backend showed a raw message key
+- The trend card's toggle buttons overflowed on narrow screens
+
+### Agent (released as `agent-v1.4.9`)
+
+- **The agent could stop starting for good after an abnormal exit** 🐛
+  - The single-instance lock is now a kernel `flock`, released automatically when the process dies, so a stale lock file or a reused PID can no longer block startup
+  - When another instance is already running the agent exits with code 1 (was 0)
+  - OpenWrt procd now retries forever (`respawn 3600 5 0`); it used to give up after 5 failed starts within an hour
+- **Report requests did not reuse connections**: successful response bodies were not read to the end, so every 2 s report opened a new TCP + TLS connection
+- A batch in flight could be lost when the agent stopped; a stop signal during the startup binding-conflict retry now exits immediately
+- Upgrade note: the standard `nekoagent upgrade` stops the agent before starting the new one, so nothing extra is needed. If you started an agent process by hand, stop it before upgrading; older versions do not hold the new lock
+
+### Development
+
+- `pnpm check:api-routes` no longer fails with ENOENT after the directory restructure
+
+[#100]: https://github.com/foru17/neko-master/pull/100
+[#103]: https://github.com/foru17/neko-master/pull/103
+[#104]: https://github.com/foru17/neko-master/pull/104
+
 ## [1.4.3] - 2026-10-09
 
 This release adds a few small features that users have asked for repeatedly.
