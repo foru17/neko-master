@@ -4,6 +4,7 @@
  * Handles time-based traffic queries: hourly stats, today traffic,
  * traffic in range, traffic trend and aggregated trend.
  */
+import { shouldUseHourlyTables } from '../../shared/utils/fact-table-routing.js';
 import type Database from 'better-sqlite3';
 import type { HourlyStats } from '@neko-master/shared';
 import { BaseRepository } from './base.repository.js';
@@ -57,9 +58,8 @@ export class TimeseriesRepository extends BaseRepository {
 
     const startDate = new Date(start!);
     const endDate = new Date(end!);
-    const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
 
-    if (endDate.getTime() - startDate.getTime() > SIX_HOURS_MS) {
+    if (shouldUseHourlyTables(startDate.getTime(), endDate.getTime())) {
       const stmt = this.db.prepare(`
         SELECT
           COALESCE(SUM(upload), 0) as upload,
@@ -92,8 +92,7 @@ export class TimeseriesRepository extends BaseRepository {
     const startStr = range?.startMinute || cutoffStr;
     const endStr = range?.endMinute || this.toMinuteKey(new Date());
 
-    const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
-    if (new Date(endStr).getTime() - new Date(startStr).getTime() > SIX_HOURS_MS) {
+    if (shouldUseHourlyTables(this.minuteKeyToDate(startStr).getTime(), this.minuteKeyToDate(endStr).getTime())) {
       const stmt = this.db.prepare(`
         SELECT hour as time, upload, download
         FROM hourly_stats
@@ -102,8 +101,8 @@ export class TimeseriesRepository extends BaseRepository {
       `);
       return stmt.all(
         backendId,
-        this.toHourKey(new Date(startStr)),
-        this.toHourKey(new Date(endStr)),
+        this.toHourKey(this.minuteKeyToDate(startStr)),
+        this.toHourKey(this.minuteKeyToDate(endStr)),
       ) as Array<{ time: string; upload: number; download: number }>;
     }
 
@@ -130,10 +129,15 @@ export class TimeseriesRepository extends BaseRepository {
     const startMinute = range?.startMinute || cutoffStr;
     const endMinute = range?.endMinute || this.toMinuteKey(new Date());
 
+    // Minute rows older than the retention window are gone; read hourly rows.
+    if (bucketMinutes < 60 && shouldUseHourlyTables(this.minuteKeyToDate(startMinute).getTime(), this.minuteKeyToDate(endMinute).getTime())) {
+      bucketMinutes = 60;
+    }
+
     // For bucketMinutes >= 60, use hourly_stats (60x fewer rows for 7-day queries)
     if (bucketMinutes >= 60) {
-      const startHour = this.toHourKey(new Date(startMinute));
-      const endHour = this.toHourKey(new Date(endMinute));
+      const startHour = this.toHourKey(this.minuteKeyToDate(startMinute));
+      const endHour = this.toHourKey(this.minuteKeyToDate(endMinute));
 
       if (bucketMinutes >= 1440) {
         if (tzOffsetMinutes !== 0) {

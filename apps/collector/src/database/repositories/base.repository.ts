@@ -4,6 +4,7 @@
  * Provides common database operations and utilities for all repositories.
  * All specific repositories should extend this class.
  */
+import { shouldUseHourlyTables } from '../../shared/utils/fact-table-routing.js';
 import type Database from 'better-sqlite3';
 import type { ProxyStats } from '@neko-master/shared';
 
@@ -22,6 +23,15 @@ export abstract class BaseRepository {
   }
 
   /**
+   * Parse a minute/hour key (YYYY-MM-DDTHH:MM:00, stored in UTC without a
+   * zone suffix) as UTC. A bare `new Date(key)` would read it as local time
+   * and shift every range by the process TZ offset.
+   */
+  protected minuteKeyToDate(key: string): Date {
+    return new Date(/[zZ]$|[+-]\d{2}:\d{2}$/.test(key) ? key : `${key}Z`);
+  }
+
+  /**
    * Convert a Date to hour key format (YYYY-MM-DDTHH:00:00)
    */
   protected toHourKey(date: Date): string {
@@ -30,7 +40,8 @@ export abstract class BaseRepository {
 
   /**
    * Resolve which fact table to use based on the time range span.
-   * For ranges > 6 hours, uses hourly_dim_stats (which is written to in real-time).
+   * For ranges > 6 hours, or ranges starting before the minute-table retention
+   * window, uses hourly_dim_stats (which is written to in real-time).
    * The start boundary is rounded down to the hour, introducing up to ~59 min of extra
    * data — negligible for long ranges (< 0.3% for 12h+, < 1% for 6h+).
    */
@@ -45,10 +56,7 @@ export abstract class BaseRepository {
       return { table: 'minute_dim_stats', startKey: this.toMinuteKey(startDate), endKey: this.toMinuteKey(endDate), timeCol: 'minute' };
     }
 
-    const rangeMs = endDate.getTime() - startDate.getTime();
-    const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
-
-    if (rangeMs > SIX_HOURS_MS) {
+    if (shouldUseHourlyTables(startDate.getTime(), endDate.getTime())) {
       return {
         table: 'hourly_dim_stats',
         startKey: this.toHourKey(startDate),

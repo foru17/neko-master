@@ -1,3 +1,4 @@
+import { setMinuteRetentionDays } from '../../shared/utils/fact-table-routing.js';
 import { StatsDatabase } from '../db/db.js';
 import { RetentionConfig, DEFAULT_RETENTION } from './cleanup.types.js';
 
@@ -43,6 +44,8 @@ export class CleanupService {
     if (this.overrides.connectionLogsDays !== undefined) merged.connectionLogsDays = this.overrides.connectionLogsDays;
     if (this.overrides.hourlyStatsDays !== undefined) merged.hourlyStatsDays = this.overrides.hourlyStatsDays;
     if (this.overrides.autoCleanup !== undefined) merged.autoCleanup = this.overrides.autoCleanup;
+    // Keep range-query routing in step with what the cleanup actually deletes.
+    setMinuteRetentionDays(merged.connectionLogsDays);
     return {
       ...merged,
       healthLogDays: this.overrides.healthLogDays ?? merged.hourlyStatsDays,

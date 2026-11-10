@@ -1,3 +1,4 @@
+import { shouldUseHourlyTables } from '../../shared/utils/fact-table-routing.js';
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
@@ -835,9 +836,7 @@ export class StatsDatabase {
     if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
       return { table: 'minute_dim_stats', startKey: this.toMinuteKey(startDate), endKey: this.toMinuteKey(endDate) };
     }
-    const rangeMs = endDate.getTime() - startDate.getTime();
-    const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
-    if (rangeMs > SIX_HOURS_MS) {
+    if (shouldUseHourlyTables(startDate.getTime(), endDate.getTime())) {
       return { table: 'hourly_dim_stats', startKey: this.toHourKey(startDate), endKey: this.toHourKey(endDate) };
     }
     return { table: 'minute_dim_stats', startKey: this.toMinuteKey(startDate), endKey: this.toMinuteKey(endDate) };
