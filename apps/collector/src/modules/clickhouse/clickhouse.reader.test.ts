@@ -64,7 +64,8 @@ ORDER BY time ASC
 
     expect(fetchMock.mock.calls[0][1]?.body).toBe(query);
     expect(fetchMock.mock.calls[1][1]?.body).toBe(query);
-    expect(original).toEqual([{ time: '2026-10-08 00:00:00', upload: 3, download: 4 }]);
+    // Always a 'T'-separated minute key, the format RealtimeStore.mergeTrend uses.
+    expect(original).toEqual([{ time: '2026-10-08T00:00:00', upload: 3, download: 4 }]);
     expect(zeroOffset).toEqual(original);
   });
 
@@ -86,5 +87,12 @@ ORDER BY time ASC
       "toDateTime(toInt64(floor((toInt64(toUnixTimestamp(minute)) + (28800)) / 86400) * 86400 - (28800)), 'UTC')",
     ));
     expect(result).toEqual([{ time: '2026-10-08T16:00:00', upload: 3, download: 4 }]);
+  });
+
+  it('returns T-separated minute keys from getTrafficTrend', async () => {
+    mockBucket('2026-10-08 20:05:00');
+    const result = await new ClickHouseReader().getTrafficTrend(1, sampleHour, sampleHour);
+
+    expect(result).toEqual([{ time: '2026-10-08T20:05:00', upload: 3, download: 4 }]);
   });
 });

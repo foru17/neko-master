@@ -289,7 +289,7 @@ ORDER BY minute ASC
 `);
     if (!rows) return null;
     return (rows as Array<any>).map((row) => ({
-      time: String(row.time || ''),
+      time: String(row.time || '').replace(' ', 'T'),
       upload: Number(row.upload || 0),
       download: Number(row.download || 0),
     }));
@@ -329,7 +329,7 @@ ORDER BY time ASC
 `);
     if (!rows) return null;
     return (rows as Array<any>).map((row) => ({
-      time: useLocalDay ? String(row.time || '').replace(' ', 'T') : String(row.time || ''),
+      time: String(row.time || '').replace(' ', 'T'),
       upload: Number(row.upload || 0),
       download: Number(row.download || 0),
     }));
