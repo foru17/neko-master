@@ -1,10 +1,15 @@
 package agent
 
 import (
+	"context"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/foru17/neko-master/apps/agent/internal/config"
 )
@@ -53,4 +58,39 @@ func TestAcquireLockIgnoresStaleLockFile(t *testing.T) {
 		t.Fatalf("lock file should hold our PID, got %q", data)
 	}
 	runner.releaseLock()
+}
+
+func TestConfigSyncBackoffStopsOnCancel(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusConflict)
+		_, _ = w.Write([]byte(`{"error":"AGENT_TOKEN_ALREADY_BOUND"}`))
+	}))
+	defer server.Close()
+
+	runner := NewRunner(config.Config{
+		ServerAPIBase:   server.URL + "/api",
+		BackendID:       1,
+		BackendToken:    "token",
+		AgentID:         "backoff-test",
+		RequestTimeout:  time.Second,
+		ReportBatchSize: 10,
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	var wg sync.WaitGroup
+	wg.Add(1)
+	done := make(chan struct{})
+	go func() {
+		runner.runConfigSyncLoop(ctx, &wg)
+		close(done)
+	}()
+
+	time.Sleep(200 * time.Millisecond) // first 409 received, now in the 5 s backoff
+	cancel()
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("runConfigSyncLoop did not return promptly after cancel during 409 backoff")
+	}
 }

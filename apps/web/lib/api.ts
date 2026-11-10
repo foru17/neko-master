@@ -69,7 +69,7 @@ async function fetchJson<T>(
     },
   };
 
-  // Bodyless POST/PUT/PATCH get an empty JSON object: a proxy or tunnel
+  // Bodyless POST/PUT get an empty JSON object: a proxy or tunnel
   // (e.g. Cloudflare Tunnel) can re-frame an empty request as chunked, and
   // Fastify then rejects it with 415 when no Content-Type is present.
   if (body === undefined && (method === 'POST' || method === 'PUT')) {

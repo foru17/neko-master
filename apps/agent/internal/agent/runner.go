@@ -318,7 +318,13 @@ func (r *Runner) runConfigSyncLoop(ctx context.Context, wg *sync.WaitGroup) {
 			if strings.Contains(err.Error(), "409") || strings.Contains(err.Error(), "AGENT_TOKEN_ALREADY_BOUND") {
 				backoff := time.Duration(i+1) * 5 * time.Second
 				log.Printf("[agent:%s] config sync binding conflict, retrying in %v... (%d/%d)", r.cfg.AgentID, backoff, i+1, maxRetries)
-				time.Sleep(backoff)
+				// Wait interruptibly: a SIGTERM during the backoff must not hold
+				// up shutdown (and the final flush) for up to 20 s.
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(backoff):
+				}
 			} else {
 				// Non-binding error, log and continue with ticker
 				log.Printf("[agent:%s] init config sync error: %v", r.cfg.AgentID, err)
