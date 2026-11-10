@@ -271,7 +271,7 @@ start_service() {
         --gateway-url "$NEKO_GATEWAY_URL"
     [ -n "$NEKO_GATEWAY_TOKEN" ] && \
         procd_append_param command --gateway-token "$NEKO_GATEWAY_TOKEN"
-    procd_set_param respawn 3600 5 5
+    procd_set_param respawn 3600 5 0
     procd_set_param stdout 1
     procd_set_param stderr 1
     procd_set_param pidfile "/var/run/neko-agent/${INSTANCE}.pid"

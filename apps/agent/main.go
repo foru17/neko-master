@@ -37,5 +37,8 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-	runner.Run(ctx)
+	if err := runner.Run(ctx); err != nil {
+		// Non-zero so supervisors (procd/systemd) treat it as a failed start.
+		os.Exit(1)
+	}
 }

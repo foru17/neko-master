@@ -9,6 +9,7 @@ import (
 	"crypto/tls"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -124,83 +125,64 @@ func NewRunner(cfg config.Config) *Runner {
 	}
 }
 
-func (r *Runner) acquireLock() error {
-	// Use OS temp directory for lock file
-	lockDir := os.TempDir()
-	lockPath := fmt.Sprintf("%s/neko-agent-backend-%d.lock", lockDir, r.cfg.BackendID)
+func (r *Runner) lockPath() string {
+	return fmt.Sprintf("%s/neko-agent-backend-%d.lock", os.TempDir(), r.cfg.BackendID)
+}
 
-	// Check if lock file exists and if process is still running
-	if data, err := os.ReadFile(lockPath); err == nil {
-		var pid int
-		if _, err := fmt.Sscanf(string(data), "%d", &pid); err == nil {
-			// Check if process is still running
-			if pid > 0 && pid != os.Getpid() {
-				if isProcessRunning(pid) {
-					return fmt.Errorf("another agent instance (PID %d) is already running for backend %d", pid, r.cfg.BackendID)
-				}
-				// Process is not running, stale lock file
-				log.Printf("[agent:%s] removing stale lock file from PID %d", r.cfg.AgentID, pid)
-				os.Remove(lockPath)
+// acquireLock takes an exclusive, non-blocking flock on a per-backend lock
+// file. The kernel releases the lock when the process dies, so a crash,
+// SIGKILL or PID reuse can never leave a stale lock that blocks startup.
+func (r *Runner) acquireLock() error {
+	lockPath := r.lockPath()
+	file, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0600)
+	if err != nil {
+		return fmt.Errorf("failed to open lock file %s: %w", lockPath, err)
+	}
+
+	if err := syscall.Flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		holder := ""
+		if data, readErr := io.ReadAll(io.LimitReader(file, 32)); readErr == nil {
+			if pid := strings.TrimSpace(string(data)); pid != "" {
+				holder = fmt.Sprintf(" (PID %s)", pid)
 			}
 		}
-	}
-
-	// Create lock file with exclusive flag (O_EXCL)
-	file, err := os.OpenFile(lockPath, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0600)
-	if err != nil {
-		if os.IsExist(err) {
-			return fmt.Errorf("lock file already exists for backend %d", r.cfg.BackendID)
-		}
-		return fmt.Errorf("failed to create lock file: %w", err)
-	}
-
-	// Write PID to lock file
-	pid := fmt.Sprintf("%d", os.Getpid())
-	if _, err := file.WriteString(pid); err != nil {
 		file.Close()
-		os.Remove(lockPath)
-		return fmt.Errorf("failed to write PID to lock file: %w", err)
+		if errors.Is(err, syscall.EWOULDBLOCK) {
+			return fmt.Errorf("another agent instance%s is already running for backend %d", holder, r.cfg.BackendID)
+		}
+		return fmt.Errorf("failed to lock %s: %w", lockPath, err)
+	}
+
+	// Record our PID for diagnostics only; the flock is what guards startup.
+	if err := file.Truncate(0); err == nil {
+		_, _ = file.WriteAt([]byte(fmt.Sprintf("%d\n", os.Getpid())), 0)
 	}
 
 	r.lockFile = file
 	return nil
 }
 
+// releaseLock drops the flock. The file itself is left in place: removing it
+// would race with another instance that has already opened the same path.
 func (r *Runner) releaseLock() {
 	if r.lockFile != nil {
-		lockPath := r.lockFile.Name()
+		_ = syscall.Flock(int(r.lockFile.Fd()), syscall.LOCK_UN)
 		r.lockFile.Close()
-		os.Remove(lockPath)
 		r.lockFile = nil
 	}
 }
 
-// isProcessRunning checks whether the PID is alive AND belongs to a
-// neko-agent process. On Linux we cross-check /proc/<pid>/comm so that a
-// stale PID later reused by an unrelated process cannot permanently block
-// agent startup. On non-Linux (or if /proc isn't available) we fall back to
-// the signal-0 liveness check.
-func isProcessRunning(pid int) bool {
-	if err := syscall.Kill(pid, 0); err != nil {
-		return false
-	}
-	data, err := os.ReadFile(fmt.Sprintf("/proc/%d/comm", pid))
-	if err != nil {
-		// /proc not readable (non-Linux, restricted hidepid, etc.) — treat
-		// liveness check as authoritative.
-		return true
-	}
-	return strings.Contains(strings.TrimSpace(string(data)), "neko-agent")
-}
-
-func (r *Runner) Run(ctx context.Context) {
+// Run blocks until ctx is cancelled. It returns an error only when the agent
+// could not start (another instance holds the lock), so the caller can exit
+// non-zero.
+func (r *Runner) Run(ctx context.Context) error {
 	log.Printf("[agent:%s] starting, backend=%d, gateway_type=%s, server=%s", r.cfg.AgentID, r.cfg.BackendID, r.cfg.GatewayType, r.cfg.ServerAPIBase)
 
 	// Acquire singleton lock to prevent multiple instances for same backend
 	if err := r.acquireLock(); err != nil {
 		log.Printf("[agent:%s] failed to acquire lock: %v", r.cfg.AgentID, err)
 		log.Printf("[agent:%s] hint: another agent instance may be running for backend %d", r.cfg.AgentID, r.cfg.BackendID)
-		return
+		return err
 	}
 	defer r.releaseLock()
 
@@ -214,6 +196,11 @@ func (r *Runner) Run(ctx context.Context) {
 
 	<-ctx.Done()
 	log.Printf("[agent:%s] stopping...", r.cfg.AgentID)
+
+	// Wait for the loops first: an in-flight report that fails on the
+	// cancelled ctx puts its batch back into retryBatch, and draining
+	// concurrently with it could lose that batch.
+	wg.Wait()
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -234,7 +221,6 @@ func (r *Runner) Run(ctx context.Context) {
 		}
 	}
 
-	wg.Wait()
 	pending, dropped := r.queueStats()
 	if pending > 0 {
 		log.Printf("[agent:%s] exit with %d pending updates", r.cfg.AgentID, pending)
@@ -242,6 +228,7 @@ func (r *Runner) Run(ctx context.Context) {
 	if dropped > 0 {
 		log.Printf("[agent:%s] dropped updates due to queue overflow: %d", r.cfg.AgentID, dropped)
 	}
+	return nil
 }
 
 func (r *Runner) runCollectorLoop(ctx context.Context, wg *sync.WaitGroup) {
@@ -702,6 +689,9 @@ func (r *Runner) postJSONWithLatency(ctx context.Context, path string, payload i
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		// Read the (small) body to EOF so the transport can reuse the
+		// connection instead of a new TCP+TLS handshake every report tick.
+		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10))
 		return time.Since(requestAt).Milliseconds(), nil
 	}
 
@@ -756,7 +746,7 @@ func (r *Runner) requeueFront(batch []domain.TrafficUpdate) {
 func (r *Runner) queueStats() (pending int, dropped int64) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return len(r.queue), r.dropped
+	return len(r.queue) + len(r.retryBatch), r.dropped
 }
 
 func firstChain(chains []string) string {
