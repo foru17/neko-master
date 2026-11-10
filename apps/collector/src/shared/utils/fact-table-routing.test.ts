@@ -38,6 +38,25 @@ describe('fact table routing', () => {
   });
 });
 
+describe('aggregated trend bucket size', () => {
+  it('keeps small buckets from minute_stats for a recent 24h range', () => {
+    const db = new Database(':memory:');
+    for (const stmt of getAllSchemaStatements()) db.exec(stmt);
+    db.prepare(`INSERT INTO backend_configs (name, url, token, enabled, is_active, listening)
+      VALUES ('test', 'http://127.0.0.1:9090', '', 1, 1, 1)`).run();
+    const minute = new Date(Date.now() - 2 * HOUR_MS).toISOString().slice(0, 16) + ':00';
+    db.prepare(`INSERT INTO minute_stats (backend_id, minute, upload, download, connections)
+      VALUES (1, ?, 5, 50, 1)`).run(minute);
+    // hourly_stats deliberately empty: a 24h range with 10-minute buckets must
+    // still be served from minute_stats.
+    const repo = new TimeseriesRepository(db);
+    const end = new Date().toISOString();
+    const start = new Date(Date.now() - 24 * HOUR_MS).toISOString();
+    const rows = repo.getTrafficTrendAggregated(1, 1440, 10, start, end);
+    expect(rows.reduce((sum, r) => sum + r.download, 0)).toBe(50);
+  });
+});
+
 describe('old short ranges after minute retention cleanup', () => {
   it('returns traffic from hourly_stats instead of zero', () => {
     const db = new Database(':memory:');

@@ -4,7 +4,7 @@
  * Handles time-based traffic queries: hourly stats, today traffic,
  * traffic in range, traffic trend and aggregated trend.
  */
-import { shouldUseHourlyTables } from '../../shared/utils/fact-table-routing.js';
+import { isBeforeMinuteRetention, shouldUseHourlyTables } from '../../shared/utils/fact-table-routing.js';
 import type Database from 'better-sqlite3';
 import type { HourlyStats } from '@neko-master/shared';
 import { BaseRepository } from './base.repository.js';
@@ -130,7 +130,9 @@ export class TimeseriesRepository extends BaseRepository {
     const endMinute = range?.endMinute || this.toMinuteKey(new Date());
 
     // Minute rows older than the retention window are gone; read hourly rows.
-    if (bucketMinutes < 60 && shouldUseHourlyTables(this.minuteKeyToDate(startMinute).getTime(), this.minuteKeyToDate(endMinute).getTime())) {
+    // Long ranges with small buckets still read minute_stats on purpose; only
+    // switch when the requested start is past the minute retention.
+    if (bucketMinutes < 60 && isBeforeMinuteRetention(this.minuteKeyToDate(startMinute).getTime())) {
       bucketMinutes = 60;
     }
 

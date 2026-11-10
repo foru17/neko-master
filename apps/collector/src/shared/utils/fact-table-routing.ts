@@ -25,7 +25,12 @@ export function getMinuteRetentionDays(): number {
   return minuteRetentionDays;
 }
 
+/** True when minute rows at startMs have already been removed by retention. */
+export function isBeforeMinuteRetention(startMs: number, nowMs = Date.now()): boolean {
+  return startMs < nowMs - minuteRetentionDays * DAY_MS;
+}
+
 export function shouldUseHourlyTables(startMs: number, endMs: number, nowMs = Date.now()): boolean {
   if (endMs - startMs > SIX_HOURS_MS) return true;
-  return startMs < nowMs - minuteRetentionDays * DAY_MS;
+  return isBeforeMinuteRetention(startMs, nowMs);
 }

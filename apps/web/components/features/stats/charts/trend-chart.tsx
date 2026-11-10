@@ -303,7 +303,7 @@ export const TrafficTrendChart = React.memo(
               {t("title")}
             </CardTitle>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <div
                 role="radiogroup"
                 aria-label={t("modeLabel")}
