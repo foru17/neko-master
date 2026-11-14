@@ -55,7 +55,7 @@ export class RuleRepository extends BaseRepository {
         SELECT rule, MAX(chain) as finalProxy,
                SUM(upload) as totalUpload, SUM(download) as totalDownload,
                SUM(connections) as totalConnections, MAX(${resolved.timeCol}) as lastSeen
-        FROM ${resolved.table}
+        FROM ${this.readStatsTable(resolved.table, backendId)}
         WHERE backend_id = ? AND ${resolved.timeCol} >= ? AND ${resolved.timeCol} <= ?
         GROUP BY rule ORDER BY (SUM(upload) + SUM(download)) DESC
       `);
@@ -65,7 +65,7 @@ export class RuleRepository extends BaseRepository {
     const stmt = this.db.prepare(`
       SELECT rule, final_proxy as finalProxy, total_upload as totalUpload, total_download as totalDownload,
              total_connections as totalConnections, last_seen as lastSeen
-      FROM rule_stats WHERE backend_id = ? ORDER BY (total_upload + total_download) DESC
+      FROM ${this.readStatsTable('rule_stats', backendId)} WHERE backend_id = ? ORDER BY (total_upload + total_download) DESC
     `);
     return stmt.all(backendId) as RuleStats[];
   }
@@ -92,7 +92,7 @@ export class RuleRepository extends BaseRepository {
         SELECT domain, SUM(upload) as totalUpload, SUM(download) as totalDownload,
                SUM(connections) as totalConnections, MAX(${resolved.timeCol}) as lastSeen,
                GROUP_CONCAT(DISTINCT ip) as ips, GROUP_CONCAT(DISTINCT chain) as chains
-        FROM ${resolved.table}
+        FROM ${this.readStatsTable(resolved.table, backendId)}
         WHERE backend_id = ? AND ${resolved.timeCol} >= ? AND ${resolved.timeCol} <= ? AND rule = ? AND domain != ''
         GROUP BY domain ORDER BY (SUM(upload) + SUM(download)) DESC LIMIT ?
       `);
@@ -146,7 +146,7 @@ export class RuleRepository extends BaseRepository {
                COALESCE(i.asn, g.asn) as asn,
                CASE WHEN g.country IS NOT NULL THEN json_array(g.country, COALESCE(g.country_name, g.country), COALESCE(g.city, ''), COALESCE(g.as_name, ''))
                     WHEN i.geoip IS NOT NULL THEN json(i.geoip) ELSE NULL END as geoIPData
-        FROM ${resolved.table} m
+        FROM ${this.readStatsTable(resolved.table, backendId)} m
         LEFT JOIN ip_stats i ON m.backend_id = i.backend_id AND m.ip = i.ip
         LEFT JOIN geoip_cache g ON m.ip = g.ip
         WHERE m.backend_id = ? AND m.${resolved.timeCol} >= ? AND m.${resolved.timeCol} <= ? AND m.rule = ? AND m.ip != ''
@@ -203,7 +203,7 @@ export class RuleRepository extends BaseRepository {
       const resolved = this.resolveFactTable(start!, end!);
       const stmt = this.db.prepare(`
         SELECT chain, SUM(upload) as totalUpload, SUM(download) as totalDownload, SUM(connections) as totalConnections
-        FROM ${resolved.table}
+        FROM ${this.readStatsTable(resolved.table, backendId)}
         WHERE backend_id = ? AND ${resolved.timeCol} >= ? AND ${resolved.timeCol} <= ? AND rule = ? AND domain = ?
         GROUP BY chain ORDER BY (SUM(upload) + SUM(download)) DESC
       `);
@@ -232,7 +232,7 @@ export class RuleRepository extends BaseRepository {
              CASE WHEN g.country IS NOT NULL THEN json_array(g.country, COALESCE(g.country_name, g.country), COALESCE(g.city, ''), COALESCE(g.as_name, ''))
                   WHEN i.geoip IS NOT NULL THEN json(i.geoip) ELSE NULL END as geoIP,
              GROUP_CONCAT(DISTINCT m.chain) as chains
-      FROM ${factTable} m
+      FROM ${this.readStatsTable(factTable, backendId)} m
       LEFT JOIN ip_stats i ON m.backend_id = i.backend_id AND m.ip = i.ip
       LEFT JOIN geoip_cache g ON m.ip = g.ip
       WHERE ${conditions.join(" AND ")}
@@ -261,7 +261,7 @@ export class RuleRepository extends BaseRepository {
       const resolved = this.resolveFactTable(start!, end!);
       const stmt = this.db.prepare(`
         SELECT chain, SUM(upload) as totalUpload, SUM(download) as totalDownload, SUM(connections) as totalConnections
-        FROM ${resolved.table}
+        FROM ${this.readStatsTable(resolved.table, backendId)}
         WHERE backend_id = ? AND ${resolved.timeCol} >= ? AND ${resolved.timeCol} <= ? AND rule = ? AND ip = ?
         GROUP BY chain ORDER BY (SUM(upload) + SUM(download)) DESC
       `);
@@ -288,7 +288,7 @@ export class RuleRepository extends BaseRepository {
              SUM(connections) as totalConnections, MAX(${timeCol}) as lastSeen,
              GROUP_CONCAT(DISTINCT CASE WHEN rule != '' THEN rule END) as rules,
              GROUP_CONCAT(DISTINCT chain) as chains
-      FROM ${factTable} WHERE ${conditions.join(" AND ")}
+      FROM ${this.readStatsTable(factTable, backendId)} WHERE ${conditions.join(" AND ")}
       GROUP BY domain ORDER BY (SUM(upload) + SUM(download)) DESC LIMIT ?
     `);
 

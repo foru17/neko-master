@@ -67,6 +67,7 @@ import { useSettings, FaviconProvider, getFaviconUrl } from "@/lib/settings";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useAuthState, authKeys } from "@/lib/auth-queries";
+import { ProxyNameAliasSettings } from "./proxy-name-alias-settings";
 
 // Favicon Provider Preview Component
 function FaviconProviderPreview({
@@ -2106,6 +2107,7 @@ export function BackendConfigDialog({
               </div>
             ) : activeTab === "preferences" ? (
               <div className="space-y-6">
+                <ProxyNameAliasSettings backends={backends} disabled={isShowcase} />
                 {/* Favicon Provider */}
                 <div className="p-4 rounded-lg border bg-card">
                   <h4 className="text-sm font-medium mb-2 flex items-center gap-2">

@@ -1,5 +1,9 @@
 import type { TimeRange } from "@/lib/api";
 
+export function getProxyNameAliasesQueryKey(backendId: number) {
+  return ["config", "proxy-name-aliases", { backendId }] as const;
+}
+
 type PaginatedQueryParams = {
   offset?: number;
   limit?: number;

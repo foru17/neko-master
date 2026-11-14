@@ -19,7 +19,7 @@ export class DeviceRepository extends BaseRepository {
       const stmt = this.db.prepare(`
         SELECT source_ip as sourceIP, SUM(upload) as totalUpload, SUM(download) as totalDownload,
                SUM(connections) as totalConnections, MAX(${resolved.timeCol}) as lastSeen
-        FROM ${resolved.table}
+        FROM ${this.readStatsTable(resolved.table, backendId)}
         WHERE backend_id = ? AND ${resolved.timeCol} >= ? AND ${resolved.timeCol} <= ? AND source_ip != ''
         GROUP BY source_ip
         ORDER BY (SUM(upload) + SUM(download)) DESC
@@ -46,7 +46,7 @@ export class DeviceRepository extends BaseRepository {
         SELECT domain, SUM(upload) as totalUpload, SUM(download) as totalDownload,
                SUM(connections) as totalConnections, MAX(${resolved.timeCol}) as lastSeen,
                GROUP_CONCAT(DISTINCT ip) as ips, GROUP_CONCAT(DISTINCT rule) as rules, GROUP_CONCAT(DISTINCT chain) as chains
-        FROM ${resolved.table}
+        FROM ${this.readStatsTable(resolved.table, backendId)}
         WHERE backend_id = ? AND ${resolved.timeCol} >= ? AND ${resolved.timeCol} <= ? AND source_ip = ? AND domain != ''
         GROUP BY domain ORDER BY (SUM(upload) + SUM(download)) DESC LIMIT ?
       `);
@@ -85,7 +85,7 @@ export class DeviceRepository extends BaseRepository {
                CASE WHEN g.country IS NOT NULL THEN json_array(g.country, COALESCE(g.country_name, g.country), COALESCE(g.city, ''), COALESCE(g.as_name, ''))
                     WHEN i.geoip IS NOT NULL THEN json(i.geoip) ELSE NULL END as geoIP,
                GROUP_CONCAT(DISTINCT m.chain) as chains, GROUP_CONCAT(DISTINCT m.rule) as rules
-        FROM ${resolved.table} m
+        FROM ${this.readStatsTable(resolved.table, backendId)} m
         LEFT JOIN ip_stats i ON m.backend_id = i.backend_id AND m.ip = i.ip
         LEFT JOIN geoip_cache g ON m.ip = g.ip
         WHERE m.backend_id = ? AND m.${resolved.timeCol} >= ? AND m.${resolved.timeCol} <= ? AND m.source_ip = ? AND m.ip != ''

@@ -8,6 +8,7 @@ import type {
   TrafficTrendPoint,
   ProxyTrafficStats,
   DeviceStats,
+  ProxyNameAlias,
 } from "@neko-master/shared";
 import { getAuthHeaders } from "./auth-queries";
 
@@ -635,6 +636,12 @@ export const api = {
     fetchJson<{ message: string; config: GeoLookupConfig }>(`${API_BASE}/db/geoip`, 'PUT', config),
 
   // Auth management
+  getProxyNameAliases: (backendId: number) =>
+    fetchJson<{ rules: ProxyNameAlias[] }>(buildUrl(`${API_BASE}/db/proxy-name-aliases`, { backendId })),
+
+  updateProxyNameAliases: (backendId: number, rules: ProxyNameAlias[]) =>
+    fetchJson<{ rules: ProxyNameAlias[] }>(`${API_BASE}/db/proxy-name-aliases`, 'PUT', { backendId, rules }),
+
   getAuthState: () =>
     fetchJson<{ enabled: boolean; hasToken: boolean }>(`${API_BASE}/auth/state`),
 

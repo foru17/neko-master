@@ -43,7 +43,7 @@ export class IPRepository extends BaseRepository {
                CASE WHEN g.country IS NOT NULL THEN json_array(g.country, COALESCE(g.country_name, g.country), COALESCE(g.city, ''), COALESCE(g.as_name, ''))
                     WHEN i.geoip IS NOT NULL THEN json(i.geoip) ELSE NULL END as geoIP,
                GROUP_CONCAT(DISTINCT m.chain) as chains, GROUP_CONCAT(DISTINCT m.rule) as rules
-        FROM ${resolved.table} m
+        FROM ${this.readStatsTable(resolved.table, backendId)} m
         LEFT JOIN ip_stats i ON m.backend_id = i.backend_id AND m.ip = i.ip
         LEFT JOIN geoip_cache g ON m.ip = g.ip
         WHERE m.backend_id = ? AND m.${resolved.timeCol} >= ? AND m.${resolved.timeCol} <= ? AND m.ip != ''
@@ -105,7 +105,7 @@ export class IPRepository extends BaseRepository {
           SUM(download) as totalDownload,
           SUM(connections) as totalConnections,
           MAX(${timeCol}) as lastSeen
-        FROM ${resolved.table}
+        FROM ${this.readStatsTable(resolved.table, backendId)}
         WHERE backend_id = ? AND ${timeCol} >= ? AND ${timeCol} <= ? AND ip != ''
         GROUP BY ip
         ORDER BY (SUM(upload) + SUM(download)) DESC
@@ -191,7 +191,7 @@ export class IPRepository extends BaseRepository {
 
       const countStmt = this.db.prepare(`
         SELECT COUNT(*) as total FROM (
-          SELECT ip FROM ${resolved.table}
+          SELECT ip FROM ${this.readStatsTable(resolved.table, backendId)}
           WHERE backend_id = ? AND ${resolved.timeCol} >= ? AND ${resolved.timeCol} <= ? AND ip != '' ${whereSearch}
           GROUP BY ip
         )
@@ -205,7 +205,7 @@ export class IPRepository extends BaseRepository {
                  SUM(upload) as totalUpload, SUM(download) as totalDownload,
                  SUM(connections) as totalConnections, MAX(${resolved.timeCol}) as lastSeen,
                  GROUP_CONCAT(DISTINCT chain) as chains
-          FROM ${resolved.table}
+          FROM ${this.readStatsTable(resolved.table, backendId)}
           WHERE backend_id = ? AND ${resolved.timeCol} >= ? AND ${resolved.timeCol} <= ? AND ip != '' ${whereSearch}
           GROUP BY ip
         )
@@ -301,8 +301,9 @@ export class IPRepository extends BaseRepository {
         params.push(sourceIP);
       }
       if (sourceChain) {
-        conditions.push("(m.chain = ? OR m.chain LIKE ?)");
-        params.push(sourceChain, `${sourceChain} > %`);
+        sourceChain = this.aliasChain(backendId, sourceChain);
+        conditions.push("(m.chain = ? OR instr(m.chain, ?) = 1)");
+        params.push(sourceChain, `${sourceChain} > `);
       }
 
       const stmt = this.db.prepare(`
@@ -313,7 +314,7 @@ export class IPRepository extends BaseRepository {
                CASE WHEN g.country IS NOT NULL THEN json_array(g.country, COALESCE(g.country_name, g.country), COALESCE(g.city, ''), COALESCE(g.as_name, ''))
                     WHEN i.geoip IS NOT NULL THEN json(i.geoip) ELSE NULL END as geoIP,
                GROUP_CONCAT(DISTINCT m.chain) as chains, GROUP_CONCAT(DISTINCT m.rule) as rules
-        FROM ${factTable} m
+        FROM ${this.readStatsTable(factTable, backendId)} m
         LEFT JOIN ip_stats i ON m.backend_id = i.backend_id AND m.ip = i.ip
         LEFT JOIN geoip_cache g ON m.ip = g.ip
         WHERE ${conditions.join(" AND ")}
@@ -368,8 +369,9 @@ export class IPRepository extends BaseRepository {
       params.push(sourceIP);
     }
     if (sourceChain) {
-      conditions.push("(chain = ? OR chain LIKE ?)");
-      params.push(sourceChain, `${sourceChain} > %`);
+      sourceChain = this.aliasChain(backendId, sourceChain);
+      conditions.push("(chain = ? OR instr(chain, ?) = 1)");
+      params.push(sourceChain, `${sourceChain} > `);
     }
 
     const stmt = this.db.prepare(`
@@ -378,7 +380,7 @@ export class IPRepository extends BaseRepository {
              SUM(connections) as totalConnections, MAX(${timeCol}) as lastSeen,
              GROUP_CONCAT(DISTINCT CASE WHEN rule != '' THEN rule END) as rules,
              GROUP_CONCAT(DISTINCT chain) as chains
-      FROM ${factTable} WHERE ${conditions.join(" AND ")}
+      FROM ${this.readStatsTable(factTable, backendId)} WHERE ${conditions.join(" AND ")}
       GROUP BY domain ORDER BY (SUM(upload) + SUM(download)) DESC LIMIT ?
     `);
 
@@ -419,22 +421,24 @@ export class IPRepository extends BaseRepository {
         params.push(sourceIP);
       }
       if (sourceChain) {
-        conditions.push("(chain = ? OR chain LIKE ?)");
-        params.push(sourceChain, `${sourceChain} > %`);
+        sourceChain = this.aliasChain(backendId, sourceChain);
+        conditions.push("(chain = ? OR instr(chain, ?) = 1)");
+        params.push(sourceChain, `${sourceChain} > `);
       }
 
       const stmt = this.db.prepare(`
         SELECT chain, SUM(upload) as totalUpload, SUM(download) as totalDownload, SUM(connections) as totalConnections
-        FROM ${factTable} WHERE ${conditions.join(" AND ")}
+        FROM ${this.readStatsTable(factTable, backendId)} WHERE ${conditions.join(" AND ")}
         GROUP BY chain ORDER BY (SUM(upload) + SUM(download)) DESC
       `);
       return stmt.all(...params) as ProxyTrafficStats[];
     }
 
     const stmt = this.db.prepare(`
-      SELECT chain, total_upload as totalUpload, total_download as totalDownload, total_connections as totalConnections
-      FROM ip_proxy_stats WHERE backend_id = ? AND ip = ?
-      ORDER BY (total_upload + total_download) DESC
+      SELECT chain, SUM(total_upload) as totalUpload, SUM(total_download) as totalDownload, SUM(total_connections) as totalConnections
+      FROM ${this.readStatsTable('ip_proxy_stats', backendId)} WHERE backend_id = ? AND ip = ?
+      GROUP BY chain
+      ORDER BY (SUM(total_upload) + SUM(total_download)) DESC
     `);
     return stmt.all(backendId, ip) as ProxyTrafficStats[];
   }

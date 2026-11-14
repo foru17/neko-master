@@ -926,6 +926,8 @@ If you want to quickly understand the system design depth, read in this order:
 4. **Realtime Channel Design**: `RealtimeStore` merge strategy and WS push
 5. **ClickHouse Module**: dual-write architecture, health fallback, read routing
 
+- [Proxy name grouping](./docs/proxy-name-grouping.en.md): combine changing subscription names without rewriting history.
+
 Full documentation index: [docs/README.md](./docs/README.md)
 
 > This documentation covers the core design of collection, aggregation, caching, realtime push, and multi-backend management.

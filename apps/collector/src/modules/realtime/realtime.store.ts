@@ -68,6 +68,7 @@ type DomainDelta = {
   ips: Set<string>;
   rules: Set<string>;
   chains: Set<string>;
+  trafficByChain?: Map<string, { totalUpload: number; totalDownload: number; totalConnections: number }>;
 };
 
 type IPDelta = {
@@ -79,6 +80,7 @@ type IPDelta = {
   domains: Set<string>;
   chains: Set<string>;
   rules: Set<string>;
+  trafficByChain?: Map<string, { totalUpload: number; totalDownload: number; totalConnections: number }>;
 };
 
 function matchesChainPrefix(fullChain: string, chain: string): boolean {
@@ -230,6 +232,30 @@ export type AgentPolicyState = {
 };
 
 export class RealtimeStore {
+  private aliasChain(backendId: number, chain: string): string {
+    return this.db?.normalizeProxyChain(backendId, chain) ?? chain;
+  }
+
+  private recordChainTraffic(delta: DomainDelta | IPDelta, chain: string, meta: TrafficMeta, connections: number): void {
+    const byChain = delta.trafficByChain ??= new Map();
+    const traffic = byChain.get(chain) ?? { totalUpload: 0, totalDownload: 0, totalConnections: 0 };
+    traffic.totalUpload += meta.upload;
+    traffic.totalDownload += meta.download;
+    traffic.totalConnections += connections;
+    byChain.set(chain, traffic);
+  }
+
+  private matchingChainTraffic(backendId: number, delta: DomainDelta | IPDelta, chain: string) {
+    const traffic = { totalUpload: 0, totalDownload: 0, totalConnections: 0 };
+    for (const [rawChain, value] of delta.trafficByChain ?? []) {
+      if (!matchesChainPrefix(this.aliasChain(backendId, rawChain), chain)) continue;
+      traffic.totalUpload += value.totalUpload;
+      traffic.totalDownload += value.totalDownload;
+      traffic.totalConnections += value.totalConnections;
+    }
+    return traffic;
+  }
+
   private clearedListeners = new Set<(backendId: number) => void>();
   private agentConfigByBackend = new Map<number, AgentGatewayConfig>();
   private agentPolicyStateByBackend = new Map<number, AgentPolicyState>();
@@ -402,6 +428,7 @@ export class RealtimeStore {
       if (meta.ip) domainDelta.ips.add(meta.ip);
       if (ruleName) domainDelta.rules.add(ruleName);
       if (fullChain) domainDelta.chains.add(fullChain);
+      this.recordChainTraffic(domainDelta, fullChain, meta, connections);
       domainMap.set(meta.domain, domainDelta);
     }
 
@@ -431,6 +458,7 @@ export class RealtimeStore {
       if (ipDomain) ipDelta.domains.add(ipDomain);
       if (fullChain) ipDelta.chains.add(fullChain);
       if (ruleName) ipDelta.rules.add(ruleName);
+      this.recordChainTraffic(ipDelta, fullChain, meta, connections);
       ipMap.set(meta.ip, ipDelta);
     }
 
@@ -753,7 +781,7 @@ export class RealtimeStore {
         if (delta.chains.size > 0) {
           const chains = new Set(existing.chains || []);
           for (const chain of delta.chains) chains.add(chain);
-          existing.chains = Array.from(chains);
+          existing.chains = Array.from(new Set(Array.from(chains).map(value => this.aliasChain(backendId, value))));
         }
       } else {
         merged.set(domain, {
@@ -764,7 +792,7 @@ export class RealtimeStore {
           lastSeen: delta.lastSeen,
           ips: Array.from(delta.ips),
           rules: Array.from(delta.rules),
-          chains: Array.from(delta.chains),
+          chains: Array.from(new Set(Array.from(delta.chains).map(value => this.aliasChain(backendId, value)))),
         });
       }
     }
@@ -800,7 +828,7 @@ export class RealtimeStore {
         if (delta.chains.size > 0) {
           const chains = new Set(existing.chains || []);
           for (const chain of delta.chains) chains.add(chain);
-          existing.chains = Array.from(chains);
+          existing.chains = Array.from(new Set(Array.from(chains).map(value => this.aliasChain(backendId, value))));
         }
       } else {
         merged.set(ip, {
@@ -810,7 +838,7 @@ export class RealtimeStore {
           totalConnections: delta.totalConnections,
           lastSeen: delta.lastSeen,
           domains: Array.from(delta.domains),
-          chains: Array.from(delta.chains),
+          chains: Array.from(new Set(Array.from(delta.chains).map(value => this.aliasChain(backendId, value)))),
         });
       }
     }
@@ -860,7 +888,7 @@ export class RealtimeStore {
         existing.rules = Array.from(rules);
         const chains = new Set(existing.chains || []);
         for (const chain of delta.chains) chains.add(chain);
-        existing.chains = Array.from(chains);
+        existing.chains = Array.from(new Set(Array.from(chains).map(value => this.aliasChain(backendId, value))));
         continue;
       }
 
@@ -874,7 +902,7 @@ export class RealtimeStore {
         lastSeen: delta.lastSeen,
         ips: Array.from(delta.ips),
         rules: Array.from(delta.rules),
-        chains: Array.from(delta.chains),
+        chains: Array.from(new Set(Array.from(delta.chains).map(value => this.aliasChain(backendId, value)))),
       });
       addedCount += 1;
     }
@@ -923,7 +951,7 @@ export class RealtimeStore {
         existing.domains = Array.from(domains);
         const chains = new Set(existing.chains || []);
         for (const chain of delta.chains) chains.add(chain);
-        existing.chains = Array.from(chains);
+        existing.chains = Array.from(new Set(Array.from(chains).map(value => this.aliasChain(backendId, value))));
         continue;
       }
 
@@ -935,7 +963,7 @@ export class RealtimeStore {
         totalConnections: delta.totalConnections,
         lastSeen: delta.lastSeen,
         domains: Array.from(delta.domains),
-        chains: Array.from(delta.chains),
+        chains: Array.from(new Set(Array.from(delta.chains).map(value => this.aliasChain(backendId, value)))),
       });
       addedCount += 1;
     }
@@ -953,6 +981,7 @@ export class RealtimeStore {
     base: DomainStats[],
     limit = 5000,
   ): DomainStats[] {
+    chain = this.aliasChain(backendId, chain);
     const domainMap = this.domainByBackend.get(backendId);
     if (!domainMap || domainMap.size === 0) return base;
 
@@ -962,14 +991,15 @@ export class RealtimeStore {
     }
 
     for (const [domain, delta] of domainMap) {
-      const matched = Array.from(delta.chains).some((full) => matchesChainPrefix(full, chain));
+      const matched = Array.from(delta.chains).some((full) => matchesChainPrefix(this.aliasChain(backendId, full), chain));
       if (!matched) continue;
+      const traffic = this.matchingChainTraffic(backendId, delta, chain);
 
       const existing = merged.get(domain);
       if (existing) {
-        existing.totalUpload += delta.totalUpload;
-        existing.totalDownload += delta.totalDownload;
-        existing.totalConnections += delta.totalConnections;
+        existing.totalUpload += traffic.totalUpload;
+        existing.totalDownload += traffic.totalDownload;
+        existing.totalConnections += traffic.totalConnections;
         if (delta.lastSeen > existing.lastSeen) {
           existing.lastSeen = delta.lastSeen;
         }
@@ -981,19 +1011,19 @@ export class RealtimeStore {
         existing.rules = Array.from(rules);
         const chains = new Set(existing.chains || []);
         for (const full of delta.chains) {
-          if (matchesChainPrefix(full, chain)) chains.add(full);
+          if (matchesChainPrefix(this.aliasChain(backendId, full), chain)) chains.add(full);
         }
-        existing.chains = Array.from(chains);
+        existing.chains = Array.from(new Set(Array.from(chains).map(value => this.aliasChain(backendId, value))));
       } else {
         merged.set(domain, {
           domain,
-          totalUpload: delta.totalUpload,
-          totalDownload: delta.totalDownload,
-          totalConnections: delta.totalConnections,
+          totalUpload: traffic.totalUpload,
+          totalDownload: traffic.totalDownload,
+          totalConnections: traffic.totalConnections,
           lastSeen: delta.lastSeen,
           ips: Array.from(delta.ips),
           rules: Array.from(delta.rules),
-          chains: Array.from(delta.chains).filter((full) => matchesChainPrefix(full, chain)),
+          chains: Array.from(new Set(Array.from(delta.chains).map(value => this.aliasChain(backendId, value)))).filter((full) => matchesChainPrefix(this.aliasChain(backendId, full), chain)),
         });
       }
     }
@@ -1009,6 +1039,7 @@ export class RealtimeStore {
     base: IPStats[],
     limit = 5000,
   ): IPStats[] {
+    chain = this.aliasChain(backendId, chain);
     const ipMap = this.ipByBackend.get(backendId);
     if (!ipMap || ipMap.size === 0) return base;
 
@@ -1018,14 +1049,15 @@ export class RealtimeStore {
     }
 
     for (const [ip, delta] of ipMap) {
-      const matched = Array.from(delta.chains).some((full) => matchesChainPrefix(full, chain));
+      const matched = Array.from(delta.chains).some((full) => matchesChainPrefix(this.aliasChain(backendId, full), chain));
       if (!matched) continue;
+      const traffic = this.matchingChainTraffic(backendId, delta, chain);
 
       const existing = merged.get(ip);
       if (existing) {
-        existing.totalUpload += delta.totalUpload;
-        existing.totalDownload += delta.totalDownload;
-        existing.totalConnections += delta.totalConnections;
+        existing.totalUpload += traffic.totalUpload;
+        existing.totalDownload += traffic.totalDownload;
+        existing.totalConnections += traffic.totalConnections;
         if (delta.lastSeen > existing.lastSeen) {
           existing.lastSeen = delta.lastSeen;
         }
@@ -1034,18 +1066,18 @@ export class RealtimeStore {
         existing.domains = Array.from(domains);
         const chains = new Set(existing.chains || []);
         for (const full of delta.chains) {
-          if (matchesChainPrefix(full, chain)) chains.add(full);
+          if (matchesChainPrefix(this.aliasChain(backendId, full), chain)) chains.add(full);
         }
-        existing.chains = Array.from(chains);
+        existing.chains = Array.from(new Set(Array.from(chains).map(value => this.aliasChain(backendId, value))));
       } else {
         merged.set(ip, {
           ip,
-          totalUpload: delta.totalUpload,
-          totalDownload: delta.totalDownload,
-          totalConnections: delta.totalConnections,
+          totalUpload: traffic.totalUpload,
+          totalDownload: traffic.totalDownload,
+          totalConnections: traffic.totalConnections,
           lastSeen: delta.lastSeen,
           domains: Array.from(delta.domains),
-          chains: Array.from(delta.chains).filter((full) => matchesChainPrefix(full, chain)),
+          chains: Array.from(new Set(Array.from(delta.chains).map(value => this.aliasChain(backendId, value)))).filter((full) => matchesChainPrefix(this.aliasChain(backendId, full), chain)),
         });
       }
     }
@@ -1060,30 +1092,18 @@ export class RealtimeStore {
     if (!proxyMap || proxyMap.size === 0) return base;
 
     const merged = new Map<string, ProxyStats>();
-    for (const item of base) {
-      merged.set(item.chain, { ...item });
-    }
-
-    for (const [chain, delta] of proxyMap) {
+    for (const item of [...base, ...proxyMap.values()]) {
+      const chain = this.aliasChain(backendId, item.chain);
       const existing = merged.get(chain);
       if (existing) {
-        existing.totalUpload += delta.totalUpload;
-        existing.totalDownload += delta.totalDownload;
-        existing.totalConnections += delta.totalConnections;
-        if (delta.lastSeen > existing.lastSeen) {
-          existing.lastSeen = delta.lastSeen;
-        }
+        existing.totalUpload += item.totalUpload;
+        existing.totalDownload += item.totalDownload;
+        existing.totalConnections += item.totalConnections;
+        if (item.lastSeen > existing.lastSeen) existing.lastSeen = item.lastSeen;
       } else {
-        merged.set(chain, {
-          chain,
-          totalUpload: delta.totalUpload,
-          totalDownload: delta.totalDownload,
-          totalConnections: delta.totalConnections,
-          lastSeen: delta.lastSeen,
-        });
+        merged.set(chain, { ...item, chain });
       }
     }
-
     return Array.from(merged.values()).sort(
       (a, b) => (b.totalDownload + b.totalUpload) - (a.totalDownload + a.totalUpload),
     );
@@ -1164,7 +1184,7 @@ export class RealtimeStore {
         if (delta.chains.size > 0) {
           const chains = new Set(existing.chains || []);
           for (const chain of delta.chains) chains.add(chain);
-          existing.chains = Array.from(chains);
+          existing.chains = Array.from(new Set(Array.from(chains).map(value => this.aliasChain(backendId, value))));
         }
       } else {
         merged.set(domain, {
@@ -1175,7 +1195,7 @@ export class RealtimeStore {
           lastSeen: delta.lastSeen,
           ips: Array.from(delta.ips),
           rules: Array.from(delta.rules),
-          chains: Array.from(delta.chains),
+          chains: Array.from(new Set(Array.from(delta.chains).map(value => this.aliasChain(backendId, value)))),
         });
       }
     }
@@ -1219,7 +1239,7 @@ export class RealtimeStore {
         if (delta.chains.size > 0) {
           const chains = new Set(existing.chains || []);
           for (const chain of delta.chains) chains.add(chain);
-          existing.chains = Array.from(chains);
+          existing.chains = Array.from(new Set(Array.from(chains).map(value => this.aliasChain(backendId, value))));
         }
       } else {
         merged.set(ip, {
@@ -1229,7 +1249,7 @@ export class RealtimeStore {
           totalConnections: delta.totalConnections,
           lastSeen: delta.lastSeen,
           domains: Array.from(delta.domains),
-          chains: Array.from(delta.chains),
+          chains: Array.from(new Set(Array.from(delta.chains).map(value => this.aliasChain(backendId, value)))),
         });
       }
     }
@@ -1308,7 +1328,7 @@ export class RealtimeStore {
         existing.rules = Array.from(rules);
         const chains = new Set(existing.chains || []);
         for (const full of delta.chains) chains.add(full);
-        existing.chains = Array.from(chains);
+        existing.chains = Array.from(new Set(Array.from(chains).map(value => this.aliasChain(backendId, value))));
       } else {
         merged.set(domain, {
           domain,
@@ -1318,7 +1338,7 @@ export class RealtimeStore {
           lastSeen: delta.lastSeen,
           ips: Array.from(delta.ips),
           rules: Array.from(delta.rules),
-          chains: Array.from(delta.chains),
+          chains: Array.from(new Set(Array.from(delta.chains).map(value => this.aliasChain(backendId, value)))),
         });
       }
     }
@@ -1358,7 +1378,7 @@ export class RealtimeStore {
         existing.domains = Array.from(domains);
         const chains = new Set(existing.chains || []);
         for (const full of delta.chains) chains.add(full);
-        existing.chains = Array.from(chains);
+        existing.chains = Array.from(new Set(Array.from(chains).map(value => this.aliasChain(backendId, value))));
       } else {
         merged.set(ip, {
           ip,
@@ -1367,7 +1387,7 @@ export class RealtimeStore {
           totalConnections: delta.totalConnections,
           lastSeen: delta.lastSeen,
           domains: Array.from(delta.domains),
-          chains: Array.from(delta.chains),
+          chains: Array.from(new Set(Array.from(delta.chains).map(value => this.aliasChain(backendId, value)))),
         });
       }
     }

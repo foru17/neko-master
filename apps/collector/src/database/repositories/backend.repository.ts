@@ -7,6 +7,7 @@
  * - Backend data management
  */
 import type Database from 'better-sqlite3';
+import { deleteProxyNameAliases } from '../proxy-name-alias.js';
 
 export interface BackendConfig {
   id: number;
@@ -177,6 +178,7 @@ export class BackendRepository {
     // fires. Explicitly delete all associated data first to avoid orphaned
     // rows accumulating after a backend is removed.
     this.deleteBackendData(id);
+    deleteProxyNameAliases(this.db, id);
     const stmt = this.db.prepare(`DELETE FROM backend_configs WHERE id = ?`);
     stmt.run(id);
   }

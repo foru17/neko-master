@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
+import { validateProxyNameAliases } from "@neko-master/shared";
 import type { StatsDatabase, GeoLookupConfig, GeoLookupProvider } from "../db/db.js";
 import type { RealtimeStore } from "../realtime/realtime.store.js";
 import { loadClickHouseConfig, runClickHouseQuery, runClickHouseTextQuery } from "../clickhouse/clickhouse.config.js";
@@ -9,6 +10,7 @@ declare module "fastify" {
     realtimeStore: RealtimeStore;
     clearAgentRuntimeState?: (backendId?: number) => void;
     notifyBackendDataCleared?: (backendId: number) => void;
+    notifyStatsSettingsChanged?: (backendId: number) => void;
   }
 }
 
@@ -161,6 +163,33 @@ async function resolveClickHouseStorageStats(
 }
 
 const configController: FastifyPluginAsync = async (fastify: FastifyInstance): Promise<void> => {
+  fastify.get<{ Querystring: { backendId?: string } }>("/proxy-name-aliases", async (request, reply) => {
+    const backendId = Number(request.query.backendId);
+    if (!Number.isSafeInteger(backendId) || backendId <= 0) {
+      return reply.status(400).send({ error: "A valid backendId is required" });
+    }
+    if (!fastify.db.getBackend(backendId)) return reply.status(404).send({ error: "Backend not found" });
+    return { rules: fastify.db.getProxyNameAliases(backendId) };
+  });
+
+  fastify.put<{ Body: { backendId?: number; rules?: unknown } }>("/proxy-name-aliases", async (request, reply) => {
+    if (fastify.authService.isShowcaseMode()) return reply.status(403).send({ error: "Forbidden" });
+    const { backendId, rules } = request.body ?? {};
+    if (typeof backendId !== "number" || !Number.isSafeInteger(backendId) || backendId <= 0) {
+      return reply.status(400).send({ error: "A valid backendId is required" });
+    }
+    if (!fastify.db.getBackend(backendId)) return reply.status(404).send({ error: "Backend not found" });
+    let validated;
+    try {
+      validated = validateProxyNameAliases(rules);
+    } catch (error: unknown) {
+      return reply.status(400).send({ error: error instanceof Error ? error.message : "Invalid proxy name rules" });
+    }
+    const saved = fastify.db.updateProxyNameAliases(backendId, validated);
+    fastify.notifyStatsSettingsChanged?.(backendId);
+    return { rules: saved };
+  });
+
   // Compatibility routes: DB management
   fastify.get("/stats", async () => {
     const sqliteSize = fastify.db.getDatabaseSize();

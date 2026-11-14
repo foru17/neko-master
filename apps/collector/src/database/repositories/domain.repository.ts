@@ -64,7 +64,7 @@ export class DomainRepository extends BaseRepository {
           GROUP_CONCAT(DISTINCT ip) as ips,
           GROUP_CONCAT(DISTINCT rule) as rules,
           GROUP_CONCAT(DISTINCT chain) as chains
-        FROM ${resolved.table}
+        FROM ${this.readStatsTable(resolved.table, backendId)}
         WHERE backend_id = ? AND ${resolved.timeCol} >= ? AND ${resolved.timeCol} <= ? AND domain != ''
         GROUP BY domain
         ORDER BY (SUM(upload) + SUM(download)) DESC
@@ -152,7 +152,7 @@ export class DomainRepository extends BaseRepository {
           SUM(download) as totalDownload,
           SUM(connections) as totalConnections,
           MAX(${timeCol}) as lastSeen
-        FROM ${resolved.table}
+        FROM ${this.readStatsTable(resolved.table, backendId)}
         WHERE backend_id = ? AND ${timeCol} >= ? AND ${timeCol} <= ? AND domain != ''
         GROUP BY domain
         ORDER BY (SUM(upload) + SUM(download)) DESC
@@ -227,7 +227,7 @@ export class DomainRepository extends BaseRepository {
         SELECT COUNT(*) as total
         FROM (
           SELECT domain
-          FROM ${resolved.table}
+          FROM ${this.readStatsTable(resolved.table, backendId)}
           WHERE backend_id = ? AND ${resolved.timeCol} >= ? AND ${resolved.timeCol} <= ? AND domain != '' ${whereSearch}
           GROUP BY domain
         )
@@ -247,7 +247,7 @@ export class DomainRepository extends BaseRepository {
           GROUP_CONCAT(DISTINCT ip) as ips,
           GROUP_CONCAT(DISTINCT rule) as rules,
           GROUP_CONCAT(DISTINCT chain) as chains
-        FROM ${resolved.table}
+        FROM ${this.readStatsTable(resolved.table, backendId)}
         WHERE backend_id = ? AND ${resolved.timeCol} >= ? AND ${resolved.timeCol} <= ? AND domain != '' ${whereSearch}
         GROUP BY domain
         ORDER BY ${rangeSortColumn} ${sortOrder}
@@ -356,8 +356,9 @@ export class DomainRepository extends BaseRepository {
         params.push(sourceIP);
       }
       if (sourceChain) {
-        conditions.push("(m.chain = ? OR m.chain LIKE ?)");
-        params.push(sourceChain, `${sourceChain} > %`);
+        sourceChain = this.aliasChain(backendId, sourceChain);
+        conditions.push("(m.chain = ? OR instr(m.chain, ?) = 1)");
+        params.push(sourceChain, `${sourceChain} > `);
       }
 
       const stmt = this.db.prepare(`
@@ -384,7 +385,7 @@ export class DomainRepository extends BaseRepository {
           END as geoIP,
           GROUP_CONCAT(DISTINCT m.chain) as chains,
           GROUP_CONCAT(DISTINCT m.rule) as rules
-        FROM ${factTable} m
+        FROM ${this.readStatsTable(factTable, backendId)} m
         LEFT JOIN ip_stats i ON m.backend_id = i.backend_id AND m.ip = i.ip
         LEFT JOIN geoip_cache g ON m.ip = g.ip
         WHERE ${conditions.join(" AND ")}
@@ -452,8 +453,9 @@ export class DomainRepository extends BaseRepository {
         params.push(sourceIP);
       }
       if (sourceChain) {
-        conditions.push("(chain = ? OR chain LIKE ?)");
-        params.push(sourceChain, `${sourceChain} > %`);
+        sourceChain = this.aliasChain(backendId, sourceChain);
+        conditions.push("(chain = ? OR instr(chain, ?) = 1)");
+        params.push(sourceChain, `${sourceChain} > `);
       }
 
       const stmt = this.db.prepare(`
@@ -462,7 +464,7 @@ export class DomainRepository extends BaseRepository {
           SUM(upload) as totalUpload,
           SUM(download) as totalDownload,
           SUM(connections) as totalConnections
-        FROM ${factTable}
+        FROM ${this.readStatsTable(factTable, backendId)}
         WHERE ${conditions.join(" AND ")}
         GROUP BY chain
         ORDER BY (SUM(upload) + SUM(download)) DESC
@@ -472,12 +474,13 @@ export class DomainRepository extends BaseRepository {
 
     const stmt = this.db.prepare(`
       SELECT chain,
-             total_upload as totalUpload,
-             total_download as totalDownload,
-             total_connections as totalConnections
-      FROM domain_proxy_stats
+             SUM(total_upload) as totalUpload,
+             SUM(total_download) as totalDownload,
+             SUM(total_connections) as totalConnections
+      FROM ${this.readStatsTable('domain_proxy_stats', backendId)}
       WHERE backend_id = ? AND domain = ?
-      ORDER BY (total_upload + total_download) DESC
+      GROUP BY chain
+      ORDER BY (SUM(total_upload) + SUM(total_download)) DESC
     `);
     return stmt.all(backendId, domain) as Array<{ chain: string; totalUpload: number; totalDownload: number; totalConnections: number }>;
   }
@@ -492,6 +495,7 @@ export class DomainRepository extends BaseRepository {
     start?: string,
     end?: string,
   ): DomainStats[] {
+    chain = this.aliasChain(backendId, chain);
     const range = this.parseMinuteRange(start, end);
     if (range) {
       const resolved = this.resolveFactTable(start!, end!);
@@ -503,8 +507,8 @@ export class DomainRepository extends BaseRepository {
           SUM(connections) as totalConnections,
           MAX(${resolved.timeCol}) as lastSeen,
           GROUP_CONCAT(DISTINCT ip) as ips
-        FROM ${resolved.table}
-        WHERE backend_id = ? AND ${resolved.timeCol} >= ? AND ${resolved.timeCol} <= ? AND (chain = ? OR chain LIKE ?) AND domain != ''
+        FROM ${this.readStatsTable(resolved.table, backendId)}
+        WHERE backend_id = ? AND ${resolved.timeCol} >= ? AND ${resolved.timeCol} <= ? AND (chain = ? OR instr(chain, ?) = 1) AND domain != ''
         GROUP BY domain
         ORDER BY (SUM(upload) + SUM(download)) DESC
         LIMIT ?
@@ -514,7 +518,7 @@ export class DomainRepository extends BaseRepository {
         resolved.startKey,
         resolved.endKey,
         chain,
-        `${chain} > %`,
+        `${chain} > `,
         limit,
       ) as Array<{
         domain: string;
@@ -536,18 +540,19 @@ export class DomainRepository extends BaseRepository {
     const stmt = this.db.prepare(`
       SELECT
         dps.domain,
-        dps.total_upload as totalUpload,
-        dps.total_download as totalDownload,
-        dps.total_connections as totalConnections,
-        dps.last_seen as lastSeen,
-        ds.ips
-      FROM domain_proxy_stats dps
+        SUM(dps.total_upload) as totalUpload,
+        SUM(dps.total_download) as totalDownload,
+        SUM(dps.total_connections) as totalConnections,
+        MAX(dps.last_seen) as lastSeen,
+        MAX(ds.ips) as ips
+      FROM ${this.readStatsTable('domain_proxy_stats', backendId)} dps
       LEFT JOIN domain_stats ds ON dps.backend_id = ds.backend_id AND dps.domain = ds.domain
-      WHERE dps.backend_id = ? AND (dps.chain = ? OR dps.chain LIKE ?)
-      ORDER BY (dps.total_upload + dps.total_download) DESC
+      WHERE dps.backend_id = ? AND (dps.chain = ? OR instr(dps.chain, ?) = 1)
+      GROUP BY dps.domain
+      ORDER BY (SUM(dps.total_upload) + SUM(dps.total_download)) DESC
       LIMIT ?
     `);
-    const rows = stmt.all(backendId, chain, `${chain} > %`, limit) as Array<{
+    const rows = stmt.all(backendId, chain, `${chain} > `, limit) as Array<{
       domain: string;
       totalUpload: number;
       totalDownload: number;
@@ -586,7 +591,7 @@ export class DomainRepository extends BaseRepository {
           MAX(${resolved.timeCol}) as lastSeen,
           GROUP_CONCAT(DISTINCT ip) as ips,
           GROUP_CONCAT(DISTINCT chain) as chains
-        FROM ${resolved.table}
+        FROM ${this.readStatsTable(resolved.table, backendId)}
         WHERE backend_id = ? AND ${resolved.timeCol} >= ? AND ${resolved.timeCol} <= ? AND rule = ? AND domain != ''
         GROUP BY domain
         ORDER BY (SUM(upload) + SUM(download)) DESC

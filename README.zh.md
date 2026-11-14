@@ -915,6 +915,8 @@ docker compose up -d
 4. **实时通道设计**：`RealtimeStore` 合并策略与 WS 推送机制
 5. **ClickHouse 模块**：双写架构、健康回退、读取路由
 
+- [代理节点名称合并](./docs/proxy-name-grouping.zh.md)：将动态订阅名称归到固定别名，保留原始历史记录。
+
 完整文档索引：[docs/README.zh.md](./docs/README.zh.md)
 
 > 该文档覆盖采集、聚合、缓存、实时推送与多后端管理的核心设计。

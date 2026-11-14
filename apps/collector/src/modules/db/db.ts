@@ -5,6 +5,8 @@ import fs from 'fs';
 import { randomBytes } from 'crypto';
 import { normalizeGeoIP, type Connection, type DomainStats, type IPStats, type HourlyStats, type ProxyStats, type RuleStats, type ProxyTrafficStats, type DeviceStats } from '@neko-master/shared';
 import { getAllSchemaStatements } from '../../database/schema.js';
+import { getProxyNameAliases, saveProxyNameAliases, aliasChain } from '../../database/proxy-name-alias.js';
+import type { ProxyNameAlias } from '@neko-master/shared';
 import { cleanupMisattributedRuleNames } from '../../database/rule-name-cleanup.js';
 import {
   AuthRepository,
@@ -82,6 +84,20 @@ function normalizePaginatedIPStatsGeoIP(result: { data: IPStats[]; total: number
 }
 
 export class StatsDatabase {
+  getProxyNameAliases(backendId: number): ProxyNameAlias[] {
+    return getProxyNameAliases(this.db, backendId);
+  }
+
+  updateProxyNameAliases(backendId: number, rules: unknown): ProxyNameAlias[] {
+    const saved = saveProxyNameAliases(this.db, backendId, rules);
+    this.clearRangeQueryCache(backendId);
+    return saved;
+  }
+
+  normalizeProxyChain(backendId: number, chain: string): string {
+    return aliasChain(this.db, backendId, chain);
+  }
+
   private db: Database.Database;
   private dbPath: string;
 

@@ -120,6 +120,10 @@ async function main() {
       wsServer.clearBackendCache(backendId);
       wsServer.broadcastStats(backendId, true);
     },
+    (backendId: number) => {
+      wsServer.clearBackendCache(backendId);
+      wsServer.broadcastStats(backendId, true);
+    },
   );
   apiServer.start();
 

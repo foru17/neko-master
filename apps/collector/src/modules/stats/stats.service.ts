@@ -47,7 +47,7 @@ export class StatsService {
     private db: StatsDatabase,
     private realtimeStore: RealtimeStore,
   ) {
-    this.clickHouseReader = new ClickHouseReader();
+    this.clickHouseReader = new ClickHouseReader(backendId => this.db.getProxyNameAliases(backendId));
   }
 
   private shouldUseClickHouse(timeRange: TimeRange): boolean {

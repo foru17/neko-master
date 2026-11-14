@@ -7,12 +7,21 @@
 import { shouldUseHourlyTables } from '../../shared/utils/fact-table-routing.js';
 import type Database from 'better-sqlite3';
 import type { ProxyStats } from '@neko-master/shared';
+import { aliasedStatsTable, aliasChain } from '../proxy-name-alias.js';
 
 export abstract class BaseRepository {
   protected db: Database.Database;
 
   constructor(db: Database.Database) {
     this.db = db;
+  }
+
+  protected readStatsTable(table: string, backendId: number): string {
+    return aliasedStatsTable(this.db, table, backendId);
+  }
+
+  protected aliasChain(backendId: number, chain: string): string {
+    return aliasChain(this.db, backendId, chain);
   }
 
   /**
@@ -477,7 +486,7 @@ export abstract class BaseRepository {
    * Expand short chains for rules using rule_chain_traffic
    */
   protected expandShortChainsForRules(backendId: number, chains: string[], rules: string[]): string[] {
-    const normalizedChains = this.uniqueNonEmpty(chains);
+    const normalizedChains = this.uniqueNonEmpty(chains.map(chain => this.aliasChain(backendId, chain)));
     if (normalizedChains.length === 0) return [];
 
     const shortChains = normalizedChains.filter((c) => !c.includes(">"));
@@ -495,14 +504,14 @@ export abstract class BaseRepository {
 
     const chainMatchers: string[] = [];
     for (const chain of shortChains) {
-      chainMatchers.push("(chain = ? OR chain LIKE ?)");
-      params.push(chain, `${chain} > %`);
+      chainMatchers.push("(chain = ? OR instr(chain, ?) = 1)");
+      params.push(chain, `${chain} > `);
     }
     whereParts.push(`(${chainMatchers.join(" OR ")})`);
 
     const whereClause = whereParts.length > 0 ? `AND ${whereParts.join(" AND ")}` : "";
     const stmt = this.db.prepare(`
-      SELECT DISTINCT chain FROM rule_chain_traffic WHERE backend_id = ? ${whereClause} LIMIT 500
+      SELECT DISTINCT chain FROM ${this.readStatsTable('rule_chain_traffic', backendId)} WHERE backend_id = ? ${whereClause} LIMIT 500
     `);
 
     const rows = stmt.all(...params) as Array<{ chain: string }>;

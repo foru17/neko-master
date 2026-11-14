@@ -572,5 +572,30 @@
     "noBackends": "No health records yet",
     "noBackendsHint": "Health checks run automatically every minute for all enabled backends and will appear here",
     "checkInterval": "Health checks are recorded once per minute. Gaps indicate the collector service was interrupted."
+  },
+  "proxyNameAliases": {
+    "title": "Proxy name grouping",
+    "description": "Group changing names under a stable alias for this backend. Historical and live traffic are combined; original records are preserved. Removing a rule restores separate statistics.",
+    "precedence": "Exact matches take priority, followed by the longest prefix. Keep node numbers and subscription identifiers in the match to avoid combining different nodes. Policy group names and DIRECT/REJECT remain unchanged.",
+    "backend": "Backend",
+    "match": "Match type",
+    "prefix": "Name starts with",
+    "exact": "Name equals",
+    "value": "Original name or prefix",
+    "alias": "Stable display name",
+    "valuePlaceholder": "US Node 01 - remaining:",
+    "aliasPlaceholder": "US Node 01",
+    "add": "Add rule",
+    "remove": "Remove rule",
+    "save": "Save rules",
+    "discard": "Discard changes",
+    "saved": "Proxy name rules saved",
+    "saveError": "Could not save proxy name rules",
+    "loadError": "Could not load proxy name rules",
+    "loading": "Loading rules…",
+    "retry": "Retry",
+    "empty": "No rules. Proxy names are counted separately.",
+    "noBackends": "Add a backend before configuring name grouping.",
+    "invalidRules": "Check the rules: names must be 1–256 characters without control characters or “ > ”; aliases cannot contain “>” or have surrounding spaces. Matches must be unique, aliases stable, and built-in names cannot be changed."
   }
 }

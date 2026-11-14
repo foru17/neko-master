@@ -1,4 +1,6 @@
 import type { GeoIPInfo } from "./geo-ip-utils.js";
+export { normalizeProxyName, normalizeProxyChain, sortProxyNameAliases, validateProxyNameAliases, RESERVED_PROXY_NAMES } from './proxy-name-alias.js';
+export type { ProxyNameAlias } from './proxy-name-alias.js';
 
 // Gateway Connection Metadata
 export interface ConnectionMetadata {

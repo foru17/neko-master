@@ -47,6 +47,7 @@ export interface AppOptions {
   autoListen?: boolean;
   onTrafficIngested?: (backendId: number) => void;
   onBackendDataCleared?: (backendId: number) => void;
+  onStatsSettingsChanged?: (backendId: number) => void;
 }
 
 type AgentTrafficUpdatePayload = {
@@ -108,6 +109,7 @@ export async function createApp(options: AppOptions) {
     autoListen = true,
     onTrafficIngested,
     onBackendDataCleared,
+    onStatsSettingsChanged,
   } = options;
   
   // Create Fastify instance
@@ -361,6 +363,7 @@ export async function createApp(options: AppOptions) {
     'notifyBackendDataCleared',
     handleBackendDataCleared,
   );
+  app.decorate('notifyStatsSettingsChanged', (backendId: number) => onStatsSettingsChanged?.(backendId));
 
   const getBackendIdFromQuery = (query: Record<string, unknown>): number | null => {
     const backendId = typeof query.backendId === 'string' ? query.backendId : undefined;
@@ -1407,6 +1410,7 @@ export class APIServer {
   private geoService?: GeoIPService;
   private onTrafficIngested?: (backendId: number) => void;
   private onBackendDataCleared?: (backendId: number) => void;
+  private onStatsSettingsChanged?: (backendId: number) => void;
 
   constructor(
     port: number, 
@@ -1416,6 +1420,7 @@ export class APIServer {
     geoService?: GeoIPService,
     onTrafficIngested?: (backendId: number) => void,
     onBackendDataCleared?: (backendId: number) => void,
+    onStatsSettingsChanged?: (backendId: number) => void,
   ) {
     this.port = port;
     this.db = db;
@@ -1424,6 +1429,7 @@ export class APIServer {
     this.geoService = geoService;
     this.onTrafficIngested = onTrafficIngested;
     this.onBackendDataCleared = onBackendDataCleared;
+    this.onStatsSettingsChanged = onStatsSettingsChanged;
   }
 
   async start() {
@@ -1435,6 +1441,7 @@ export class APIServer {
       geoService: this.geoService,
       onTrafficIngested: this.onTrafficIngested,
       onBackendDataCleared: this.onBackendDataCleared,
+      onStatsSettingsChanged: this.onStatsSettingsChanged,
       logger: false,
     });
     return this.app;

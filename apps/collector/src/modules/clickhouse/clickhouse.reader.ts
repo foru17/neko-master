@@ -4,7 +4,10 @@ import type {
   IPStats,
   ProxyStats,
   RuleStats,
+  ProxyNameAlias,
 } from '@neko-master/shared';
+import { normalizeProxyChain } from '@neko-master/shared';
+import { proxyChainExpression } from '../../database/proxy-name-alias.js';
 import { loadClickHouseConfig } from './clickhouse.config.js';
 
 type StatsQuerySource = 'sqlite' | 'clickhouse' | 'auto';
@@ -51,6 +54,15 @@ export type ClickHouseSummary = {
 };
 
 export class ClickHouseReader {
+  constructor(private readonly getProxyNameAliases: (backendId: number) => ProxyNameAlias[] = () => []) {}
+
+  private detailTable(backendId: number): string {
+    const table = `${this.config.database}.traffic_detail_buffer`;
+    const rules = this.getProxyNameAliases(backendId);
+    if (!rules.length) return table;
+    return `(SELECT * REPLACE (${proxyChainExpression('chain', rules, 'clickhouse')} AS chain) FROM ${table} WHERE backend_id = ${backendId})`;
+  }
+
   private readonly config = loadClickHouseConfig();
   private readonly source = this.parseSource(process.env.STATS_QUERY_SOURCE);
   private readonly strictStats = process.env.CH_STRICT_STATS === '1';
@@ -89,7 +101,7 @@ WHERE backend_id = ${backendId}
 SELECT
   toUInt64(uniqIf(domain, domain != '')) AS uniqueDomains,
   toUInt64(uniqIf(ip, ip != '')) AS uniqueIPs
-FROM ${this.config.database}.traffic_detail_buffer
+FROM ${this.detailTable(backendId)}
 WHERE backend_id = ${backendId}
   AND minute >= toDateTime('${this.toDateTime(start)}')
   AND minute <= toDateTime('${this.toDateTime(end)}')
@@ -121,7 +133,7 @@ SELECT
   toUInt64(SUM(download)) AS totalDownload,
   toUInt64(SUM(connections)) AS totalConnections,
   toString(max(minute)) AS lastSeen
-FROM ${this.config.database}.traffic_detail_buffer
+FROM ${this.detailTable(backendId)}
 WHERE backend_id = ${backendId}
   AND minute >= toDateTime('${this.toDateTime(start)}')
   AND minute <= toDateTime('${this.toDateTime(end)}')
@@ -156,7 +168,7 @@ SELECT
   toUInt64(SUM(download)) AS totalDownload,
   toUInt64(SUM(connections)) AS totalConnections,
   toString(max(minute)) AS lastSeen
-FROM ${this.config.database}.traffic_detail_buffer
+FROM ${this.detailTable(backendId)}
 WHERE backend_id = ${backendId}
   AND minute >= toDateTime('${this.toDateTime(start)}')
   AND minute <= toDateTime('${this.toDateTime(end)}')
@@ -367,7 +379,7 @@ ORDER BY time ASC
 SELECT toUInt64(COUNT()) AS total
 FROM (
   SELECT domain
-  FROM ${this.config.database}.traffic_detail_buffer
+  FROM ${this.detailTable(backendId)}
   WHERE backend_id = ${backendId}
     AND minute >= toDateTime('${this.toDateTime(start)}')
     AND minute <= toDateTime('${this.toDateTime(end)}')
@@ -386,7 +398,7 @@ SELECT
   toString(max(minute)) AS lastSeen,
   arrayDistinct(groupArrayIf(rule, rule != '')) AS rules,
   arrayDistinct(groupArrayIf(chain, chain != '')) AS chains
-FROM ${this.config.database}.traffic_detail_buffer
+FROM ${this.detailTable(backendId)}
 WHERE backend_id = ${backendId}
   AND minute >= toDateTime('${this.toDateTime(start)}')
   AND minute <= toDateTime('${this.toDateTime(end)}')
@@ -444,7 +456,7 @@ LIMIT ${limit} OFFSET ${offset}
 SELECT toUInt64(COUNT()) AS total
 FROM (
   SELECT ip
-  FROM ${this.config.database}.traffic_detail_buffer
+  FROM ${this.detailTable(backendId)}
   WHERE backend_id = ${backendId}
     AND minute >= toDateTime('${this.toDateTime(start)}')
     AND minute <= toDateTime('${this.toDateTime(end)}')
@@ -462,7 +474,7 @@ SELECT
   toUInt64(SUM(connections)) AS totalConnections,
   toString(max(minute)) AS lastSeen,
   arrayDistinct(groupArrayIf(chain, chain != '')) AS chains
-FROM ${this.config.database}.traffic_detail_buffer
+FROM ${this.detailTable(backendId)}
 WHERE backend_id = ${backendId}
   AND minute >= toDateTime('${this.toDateTime(start)}')
   AND minute <= toDateTime('${this.toDateTime(end)}')
@@ -499,7 +511,7 @@ SELECT
   toUInt64(SUM(download)) AS totalDownload,
   toUInt64(SUM(connections)) AS totalConnections,
   toString(max(minute)) AS lastSeen
-FROM ${this.config.database}.traffic_detail_buffer
+FROM ${this.detailTable(backendId)}
 WHERE backend_id = ${backendId}
   AND minute >= toDateTime('${this.toDateTime(start)}')
   AND minute <= toDateTime('${this.toDateTime(end)}')
@@ -529,7 +541,7 @@ SELECT
   toUInt64(SUM(download)) AS totalDownload,
   toUInt64(SUM(connections)) AS totalConnections,
   toString(max(minute)) AS lastSeen
-FROM ${this.config.database}.traffic_detail_buffer
+FROM ${this.detailTable(backendId)}
 WHERE backend_id = ${backendId}
   AND minute >= toDateTime('${this.toDateTime(start)}')
   AND minute <= toDateTime('${this.toDateTime(end)}')
@@ -602,7 +614,7 @@ WHERE minute >= now() - INTERVAL 90 DAY
 SELECT
   rule,
   groupUniqArray(arrayElement(splitByString(' > ', chain), 1)) AS proxies
-FROM ${this.config.database}.traffic_detail_buffer
+FROM ${this.detailTable(backendId)}
 WHERE backend_id = ${backendId}
   AND rule != ''
   AND chain != ''${timeWhere}
@@ -938,7 +950,7 @@ SELECT
   toUInt64(SUM(download)) AS totalDownload,
   toUInt64(SUM(connections)) AS totalConnections,
   toString(max(minute)) AS lastSeen
-FROM ${this.config.database}.traffic_detail_buffer
+FROM ${this.detailTable(backendId)}
 WHERE backend_id = ${backendId}
   AND minute >= toDateTime('${this.toDateTime(start)}')
   AND minute <= toDateTime('${this.toDateTime(end)}')
@@ -971,7 +983,7 @@ LIMIT ${Math.max(1, limit)}
       ip?: string;
     },
   ): Promise<DomainStats[] | null> {
-    const clauses = this.buildFilters(filters);
+    const clauses = this.buildFilters(backendId, filters);
     const rows = await this.query<any>(`
 SELECT
   domain,
@@ -982,7 +994,7 @@ SELECT
   toString(max(minute)) AS lastSeen,
   arrayDistinct(groupArrayIf(rule, rule != '')) AS rules,
   arrayDistinct(groupArrayIf(chain, chain != '')) AS chains
-FROM ${this.config.database}.traffic_detail_buffer
+FROM ${this.detailTable(backendId)}
 WHERE backend_id = ${backendId}
   AND minute >= toDateTime('${this.toDateTime(start)}')
   AND minute <= toDateTime('${this.toDateTime(end)}')
@@ -1018,7 +1030,7 @@ LIMIT ${Math.max(1, limit)}
       ip?: string;
     },
   ): Promise<IPStats[] | null> {
-    const clauses = this.buildFilters(filters);
+    const clauses = this.buildFilters(backendId, filters);
     const rows = await this.query<any>(`
 SELECT
   ip,
@@ -1028,7 +1040,7 @@ SELECT
   toUInt64(SUM(connections)) AS totalConnections,
   toString(max(minute)) AS lastSeen,
   arrayDistinct(groupArrayIf(chain, chain != '')) AS chains
-FROM ${this.config.database}.traffic_detail_buffer
+FROM ${this.detailTable(backendId)}
 WHERE backend_id = ${backendId}
   AND minute >= toDateTime('${this.toDateTime(start)}')
   AND minute <= toDateTime('${this.toDateTime(end)}')
@@ -1062,14 +1074,14 @@ LIMIT ${Math.max(1, limit)}
       ip?: string;
     },
   ): Promise<any[] | null> {
-    const clauses = this.buildFilters(filters);
+    const clauses = this.buildFilters(backendId, filters);
     const rows = await this.query<any>(`
 SELECT
   chain,
   toUInt64(SUM(upload)) AS totalUpload,
   toUInt64(SUM(download)) AS totalDownload,
   toUInt64(SUM(connections)) AS totalConnections
-FROM ${this.config.database}.traffic_detail_buffer
+FROM ${this.detailTable(backendId)}
 WHERE backend_id = ${backendId}
   AND minute >= toDateTime('${this.toDateTime(start)}')
   AND minute <= toDateTime('${this.toDateTime(end)}')
@@ -1246,14 +1258,14 @@ ORDER BY rule, chain
     return date.toISOString().slice(0, 19).replace('T', ' ');
   }
 
-  private buildFilters(filters: Record<string, string | undefined>): string {
+  private buildFilters(backendId: number, filters: Record<string, string | undefined>): string {
     const clauses: string[] = [];
     if (filters.chain) {
-      const chain = this.esc(filters.chain);
+      const chain = this.esc(normalizeProxyChain(filters.chain, this.getProxyNameAliases(backendId)));
       clauses.push(`(chain = '${chain}' OR startsWith(chain, '${chain} > '))`);
     }
     if (filters.sourceChain) {
-      const chain = this.esc(filters.sourceChain);
+      const chain = this.esc(normalizeProxyChain(filters.sourceChain, this.getProxyNameAliases(backendId)));
       clauses.push(`(chain = '${chain}' OR startsWith(chain, '${chain} > '))`);
     }
     if (filters.rule) clauses.push(`rule = '${this.esc(filters.rule)}'`);
