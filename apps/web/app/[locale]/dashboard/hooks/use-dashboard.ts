@@ -23,10 +23,13 @@ import {
 import { useStableTimeRange } from "@/lib/hooks/use-stable-time-range";
 import { useStatsWebSocket, type SummaryField } from "@/lib/websocket";
 import { useRequireAuth } from "@/lib/auth";
+import { useSettings, type BackendView } from "@/lib/settings";
 import { toast } from "sonner";
-import type {
-  StatsSummary,
-  CountryStats,
+import {
+  isMergedBackendId,
+  MERGED_BACKEND_ID,
+  type CountryStats,
+  type StatsSummary,
 } from "@neko-master/shared";
 
 export type { BackendStatus, TabId, TimePreset };
@@ -58,6 +61,8 @@ export interface UseDashboardReturn {
   activeBackend: Awaited<ReturnType<typeof api.getBackends>>[0] | null;
   listeningBackends: Awaited<ReturnType<typeof api.getBackends>>;
   activeBackendId: number | undefined;
+  /** True while every collecting backend is shown combined (activeBackendId is the reserved merged id). */
+  isMergedView: boolean;
   backendStatus: BackendStatus;
   backendStatusHint: string | null;
   queryError: string | null;
@@ -74,6 +79,7 @@ export interface UseDashboardReturn {
   handleTimeRangeChange: (range: TimeRange, preset: TimePreset) => void;
   handleSwitchBackend: (backendId: number) => Promise<void>;
   handleBackendChange: () => Promise<void>;
+  setBackendView: (view: BackendView) => void;
   refreshNow: (showLoading?: boolean) => Promise<void>;
 
   // Theme
@@ -99,6 +105,7 @@ export function useDashboard(): UseDashboardReturn {
   const pathname = usePathname();
   const { theme, setTheme } = useTheme();
   const queryClient = useQueryClient();
+  const { settings, setSettings } = useSettings();
 
   // Locale from next-intl context — robust against route structure changes,
   // unlike parsing the pathname.
@@ -168,7 +175,10 @@ export function useDashboard(): UseDashboardReturn {
     () => backends.filter((backend) => backend.listening),
     [backends]
   );
-  const activeBackendId = activeBackend?.id;
+  // The merged view needs something to merge; otherwise fall back to the active backend.
+  const prefersMergedView = settings.backendView === "merged";
+  const isMergedView = prefersMergedView && listeningBackends.length > 1;
+  const activeBackendId = isMergedView ? MERGED_BACKEND_ID : activeBackend?.id;
 
   // WebSocket
   const wsEnabled = autoRefresh && isWsSummaryTab && !!activeBackendId;
@@ -305,6 +315,14 @@ export function useDashboard(): UseDashboardReturn {
 
   // Backend Status
   const backendStatus: BackendStatus = useMemo(() => {
+    if (isMergedView) {
+      if (effectiveSummaryError) return "unhealthy";
+      // The combined view only breaks down when every member is down.
+      if (listeningBackends.every((backend) => backend.health?.status === "unhealthy")) {
+        return "unhealthy";
+      }
+      return "healthy";
+    }
     if (!activeBackend) return "unknown";
     if (effectiveSummaryError) return "unhealthy";
     // Prefer the live health-check result when available
@@ -313,14 +331,17 @@ export function useDashboard(): UseDashboardReturn {
     // Fallback: infer from listening flag
     if (activeBackend.listening) return "healthy";
     return "unhealthy";
-  }, [activeBackend, effectiveSummaryError]);
+  }, [activeBackend, effectiveSummaryError, isMergedView, listeningBackends]);
 
   const backendStatusHint = useMemo(() => {
     if (effectiveSummaryError) return effectiveSummaryError;
+    if (isMergedView) {
+      return backendStatus === "unhealthy" ? dashboardT("backendUnavailableHint") : null;
+    }
     if (activeBackend && !activeBackend.listening)
       return dashboardT("backendUnavailableHint");
     return null;
-  }, [effectiveSummaryError, activeBackend, dashboardT]);
+  }, [effectiveSummaryError, activeBackend, dashboardT, isMergedView, backendStatus]);
 
   // Actions
   const refreshNow = useCallback(
@@ -353,11 +374,29 @@ export function useDashboard(): UseDashboardReturn {
     []
   );
 
+  const setBackendView = useCallback(
+    (view: BackendView) => setSettings({ backendView: view }),
+    [setSettings]
+  );
+
   const handleSwitchBackend = useCallback(
     async (backendId: number) => {
+      // The merged view is a client-side choice; there is nothing to activate.
+      if (isMergedBackendId(backendId)) {
+        if (isMergedView) return;
+        setBackendView("merged");
+        await refreshNow(true);
+        return;
+      }
+
       try {
         await api.setActiveBackend(backendId);
         const { data: latestBackends } = await backendsQuery.refetch();
+        // Leave the merged view only once the refreshed list shows the chosen
+        // backend as active, so the dashboard never flashes the previous one.
+        if (prefersMergedView) {
+          setBackendView("single");
+        }
         await refreshNow(true);
         
         // Check backend health after switching (use fresh data from refetch)
@@ -375,7 +414,7 @@ export function useDashboard(): UseDashboardReturn {
         console.error("Failed to switch backend:", err);
       }
     },
-    [backendsQuery.refetch, refreshNow, dashboardT]
+    [backendsQuery.refetch, refreshNow, dashboardT, prefersMergedView, setBackendView, isMergedView]
   );
 
   const handleBackendChange = useCallback(async () => {
@@ -455,6 +494,7 @@ export function useDashboard(): UseDashboardReturn {
     activeBackend,
     listeningBackends,
     activeBackendId,
+    isMergedView,
     backendStatus,
     backendStatusHint,
     queryError,
@@ -471,6 +511,7 @@ export function useDashboard(): UseDashboardReturn {
     handleTimeRangeChange,
     handleSwitchBackend,
     handleBackendChange,
+    setBackendView,
     refreshNow,
 
     // Theme

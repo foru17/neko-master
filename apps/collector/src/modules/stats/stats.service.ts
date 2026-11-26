@@ -34,7 +34,8 @@ interface PaginatedStatsOptions {
 type RoutedSource = 'clickhouse' | 'sqlite';
 
 export class StatsService {
-  private clickHouseReader: ClickHouseReader;
+  // Visible to MergedAwareStatsService, which routes merged-view counts the same way.
+  protected clickHouseReader: ClickHouseReader;
   private readonly strictStats = process.env.CH_STRICT_STATS === '1';
   private routeMetricsIntervalMs = Math.max(
     1000,
@@ -50,7 +51,7 @@ export class StatsService {
     this.clickHouseReader = new ClickHouseReader();
   }
 
-  private shouldUseClickHouse(timeRange: TimeRange): boolean {
+  protected shouldUseClickHouse(timeRange: TimeRange): boolean {
     return (
       timeRange.active &&
       this.clickHouseReader.shouldUseForRange(timeRange.start, timeRange.end)
@@ -97,7 +98,8 @@ export class StatsService {
     return this.strictStats && this.clickHouseReader.shouldUse();
   }
 
-  private failIfStrictFallback(route: string): void {
+  // Visible to MergedAwareStatsService, whose merged counts fall back the same way.
+  protected failIfStrictFallback(route: string): void {
     if (!this.isStrictStatsEnabled()) {
       return;
     }

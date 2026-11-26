@@ -275,6 +275,8 @@ interface BackendConfigDialogProps {
   isFirstTime?: boolean;
   onConfigComplete?: () => void;
   onBackendChange?: () => void;
+  /** Called once a backend is set active, so the dashboard can leave the merged view. */
+  onSetActive?: () => void;
 }
 
 interface AgentBootstrapInfo {
@@ -646,6 +648,7 @@ export function BackendConfigDialog({
   isFirstTime = false,
   onConfigComplete,
   onBackendChange,
+  onSetActive,
 }: BackendConfigDialogProps) {
   const t = useTranslations("backend");
   const commonT = useTranslations("common");
@@ -1150,6 +1153,8 @@ export function BackendConfigDialog({
       await loadBackends(true);
       // Notify parent to refresh dashboard data
       await onBackendChange?.();
+      // Leave the merged view last, once the dashboard knows which backend is active.
+      onSetActive?.();
       // Show toast notification
       toast.success(t("switchSuccess"));
     } catch (error: any) {

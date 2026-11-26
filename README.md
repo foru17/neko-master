@@ -350,6 +350,17 @@ Or configure via Surge's graphical interface:
 
 > 💡 **Note**: Surge uses HTTP polling to fetch data (compared to Clash's WebSocket real-time stream), with a data refresh delay of approximately 2 seconds.
 
+### Combine Several Backends (Merged View)
+
+Every enabled backend is collected at the same time, and the switcher in the header shows one of them. Once two or more backends are collecting, the switcher also offers **All backends**, which shows all of them combined. It is the default in that case, and the choice is remembered per browser.
+
+- Traffic, connections and time series are summed.
+- Domains, IPs, devices, proxies, policy groups and countries that share a name across backends are summed under that name, so a domain seen on two gateways is counted once.
+- The Rules tab works in the merged view too, but its live policy-chain highlight and zero-traffic rules come from a single gateway; select one backend to see them.
+- The merged domain and IP tables page through at most the top 2,000 rows of each backend. To reach rows beyond that, use the search box or switch to a single backend.
+
+The merged view is served by the collector: every stats endpoint and the stats WebSocket accept the reserved backend id `-1` in place of a backend id.
+
 ## 🔧 Port Conflict Resolution
 
 If you see "port already in use" error, here are the solutions:
