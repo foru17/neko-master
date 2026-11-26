@@ -674,6 +674,32 @@ export class StatsDatabase {
       () => normalizePaginatedIPStatsGeoIP(this.repos.ip.getIPStatsPaginated(backendId, opts)),
     );
   }
+
+  /**
+   * Distinct domain / IP counts across several backends (merged view).
+   * Range-cached like the per-backend queries. Their keys carry the whole
+   * member list (`mergedDomainCount:1,2|…`), so clearRangeQueryCache drops
+   * every merged entry whenever any backend flushes.
+   */
+  countDomainsAcrossBackends(backendIds: number[], opts: { search?: string; start?: string; end?: string } = {}) {
+    return this.withRangeQueryCache(
+      'mergedDomainCount',
+      [backendIds.join(','), opts.search || '', opts.start || '', opts.end || ''],
+      opts.start,
+      opts.end,
+      () => this.repos.domain.countDomainsAcrossBackends(backendIds, opts),
+    );
+  }
+  countIPsAcrossBackends(backendIds: number[], opts: { search?: string; start?: string; end?: string } = {}) {
+    return this.withRangeQueryCache(
+      'mergedIpCount',
+      [backendIds.join(','), opts.search || '', opts.start || '', opts.end || ''],
+      opts.start,
+      opts.end,
+      () => this.repos.ip.countIPsAcrossBackends(backendIds, opts),
+    );
+  }
+
   getIPDomainDetails(backendId: number, ip: string, start?: string, end?: string, limit?: number, sourceIP?: string, sourceChain?: string) { return this.repos.ip.getIPDomainDetails(backendId, ip, start, end, limit, sourceIP, sourceChain); }
   getIPProxyStats(backendId: number, ip: string, start?: string, end?: string, sourceIP?: string, sourceChain?: string) { return this.repos.ip.getIPProxyStats(backendId, ip, start, end, sourceIP, sourceChain); }
   getTopIPs(backendId: number, limit = 10, start?: string, end?: string) { return this.getIPStats(backendId, limit, start, end); }
@@ -922,8 +948,11 @@ export class StatsDatabase {
     }
 
     const backendMarker = `:${backendId}|`;
+    // Merged-view counts combine several backends, so a flush of any backend
+    // stales all of them, whatever their member list is.
+    const mergedCountKey = /^merged(Domain|Ip)Count:/;
     for (const key of this.rangeQueryCache.keys()) {
-      if (key.includes(backendMarker)) {
+      if (key.includes(backendMarker) || mergedCountKey.test(key)) {
         this.rangeQueryCache.delete(key);
       }
     }

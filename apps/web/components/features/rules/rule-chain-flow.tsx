@@ -38,7 +38,7 @@ import { useStableTimeRange } from "@/lib/hooks/use-stable-time-range";
 import { useIsWindows } from "@/lib/hooks/use-is-windows";
 import { resolveActiveChains, encodeActiveLinkKey, type ActiveChainInfo } from "@/lib/active-chain";
 import { useTranslations } from "next-intl";
-import type { StatsSummary } from "@neko-master/shared";
+import { isMergedBackendId, type StatsSummary } from "@neko-master/shared";
 import { useGatewayProviders, useGatewayProxies } from "@/hooks/api/use-gateway";
 import { useGatewayRules } from "@/hooks/api/use-rules";
 
@@ -1153,7 +1153,9 @@ function UnifiedRuleChainFlowInner({
     // If activeChainInfo is not loaded yet and we're not showing all policies,
     // we need to wait for it to properly filter the data.
     // Return empty data to show loading state instead of unfiltered data.
-    if (!activeChainInfo && !activePolicyOnly) {
+    // The merged view has no single gateway to resolve active chains from, so
+    // it shows the full graph instead of waiting.
+    if (!activeChainInfo && !activePolicyOnly && !isMergedBackendId(activeBackendId)) {
       return { nodes: [], links: [], rulePaths: {}, maxLayer: 0 };
     }
     if (!activeChainInfo) return data;
@@ -1459,7 +1461,7 @@ function UnifiedRuleChainFlowInner({
       rulePaths: newRulePaths,
       maxLayer,
     };
-  }, [data, activePolicyOnly, activeChainInfo, selectedRule, visibleRuleNames]);
+  }, [data, activePolicyOnly, activeChainInfo, selectedRule, visibleRuleNames, activeBackendId]);
 
   const renderData = filteredData;
 

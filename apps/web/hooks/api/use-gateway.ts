@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { isMergedBackendId } from "@neko-master/shared";
 import { api } from "@/lib/api";
 import { QUERY_CONFIG } from "@/lib/query-config";
 
@@ -20,12 +21,15 @@ export function useGatewayProviders({
   activeBackendId,
   enabled = true,
 }: UseGatewayOptions) {
+  // Live gateway state belongs to a single gateway, so the merged view has
+  // none and must not borrow the previous backend's data as a placeholder.
+  const isMerged = isMergedBackendId(activeBackendId);
   return useQuery({
     queryKey: [PROVIDERS_KEY, { backendId: activeBackendId }],
     queryFn: () => api.getGatewayProviders(activeBackendId),
-    enabled: !!activeBackendId && enabled,
+    enabled: !!activeBackendId && enabled && !isMerged,
     staleTime: 5 * 60 * 1000, // 5 分钟
-    placeholderData: (previous) => previous,
+    placeholderData: isMerged ? undefined : (previous) => previous,
   });
 }
 
@@ -36,12 +40,13 @@ export function useGatewayProxies({
   activeBackendId,
   enabled = true,
 }: UseGatewayOptions) {
+  const isMerged = isMergedBackendId(activeBackendId);
   return useQuery({
     queryKey: [PROXIES_KEY, { backendId: activeBackendId }],
     queryFn: () => api.getGatewayProxies(activeBackendId),
-    enabled: !!activeBackendId && enabled,
+    enabled: !!activeBackendId && enabled && !isMerged,
     staleTime: 5 * 60 * 1000, // 5 分钟
-    placeholderData: (previous) => previous,
+    placeholderData: isMerged ? undefined : (previous) => previous,
   });
 }
 

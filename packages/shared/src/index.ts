@@ -161,6 +161,15 @@ export interface RuleChainFlowAll {
   maxLayer: number;
 }
 
+// Backend scope
+// Reserved backend id that means "every enabled, listening backend, merged".
+// Real ids come from AUTOINCREMENT and are always positive, so it cannot collide.
+export const MERGED_BACKEND_ID = -1;
+
+export function isMergedBackendId(backendId: number | null | undefined): boolean {
+  return backendId === MERGED_BACKEND_ID;
+}
+
 // API Response Types
 export interface StatsSummary {
   totalUpload: number;

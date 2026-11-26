@@ -487,6 +487,78 @@ LIMIT ${limit} OFFSET ${offset}
     return { data, total };
   }
 
+  /**
+   * Distinct domain count across several backends (merged view). ClickHouse
+   * counterpart of DomainRepository.countDomainsAcrossBackends.
+   */
+  async countDomainsAcrossBackends(
+    backendIds: number[],
+    start: string,
+    end: string,
+    search?: string,
+  ): Promise<number | null> {
+    const idList = this.mergeIdList(backendIds);
+    if (!idList) return 0;
+    const searchClause = search
+      ? ` AND positionCaseInsensitive(domain, '${this.esc(search)}') > 0`
+      : '';
+
+    const rows = await this.query<Record<string, unknown>>(`
+SELECT toUInt64(COUNT()) AS total
+FROM (
+  SELECT domain
+  FROM ${this.config.database}.traffic_detail_buffer
+  WHERE backend_id IN (${idList})
+    AND minute >= toDateTime('${this.toDateTime(start)}')
+    AND minute <= toDateTime('${this.toDateTime(end)}')
+    AND domain != '' ${searchClause}
+  GROUP BY domain
+)
+`);
+    if (!rows) return null;
+    return Number(rows[0]?.total || 0);
+  }
+
+  /**
+   * Distinct IP count across several backends (merged view). ClickHouse
+   * counterpart of IPRepository.countIPsAcrossBackends.
+   */
+  async countIPsAcrossBackends(
+    backendIds: number[],
+    start: string,
+    end: string,
+    search?: string,
+  ): Promise<number | null> {
+    const idList = this.mergeIdList(backendIds);
+    if (!idList) return 0;
+    const searchClause = search
+      ? ` AND (positionCaseInsensitive(ip, '${this.esc(search)}') > 0 OR positionCaseInsensitive(domain, '${this.esc(search)}') > 0)`
+      : '';
+
+    const rows = await this.query<Record<string, unknown>>(`
+SELECT toUInt64(COUNT()) AS total
+FROM (
+  SELECT ip
+  FROM ${this.config.database}.traffic_detail_buffer
+  WHERE backend_id IN (${idList})
+    AND minute >= toDateTime('${this.toDateTime(start)}')
+    AND minute <= toDateTime('${this.toDateTime(end)}')
+    AND ip != '' ${searchClause}
+  GROUP BY ip
+)
+`);
+    if (!rows) return null;
+    return Number(rows[0]?.total || 0);
+  }
+
+  /**
+   * Backend id list for a merged-view `IN (...)` clause, or '' when empty.
+   * Only positive integers are ever interpolated into the query.
+   */
+  private mergeIdList(backendIds: number[]): string {
+    return backendIds.filter((id) => Number.isInteger(id) && id > 0).join(', ');
+  }
+
   async getProxyStats(
     backendId: number,
     start: string,

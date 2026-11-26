@@ -1,5 +1,6 @@
 import { WebSocketServer as WSServer, WebSocket } from 'ws';
 import type { StatsSummary, DomainStats, IPStats, ProxyStats, CountryStats, DeviceStats, RuleStats, HourlyStats } from '@neko-master/shared';
+import { isMergedBackendId, MERGED_BACKEND_ID } from '@neko-master/shared';
 import type { StatsDatabase } from '../db/db.js';
 import type { StatsService } from '../stats/stats.service.js';
 import type { SummaryFieldKey, SummaryFieldMask } from './websocket.types.js';
@@ -293,8 +294,10 @@ export class StatsWebSocketServer {
             let changed = false;
 
             if (msg.backendId !== undefined) {
-              const backend = this.db.getBackend(msg.backendId);
-              if (backend) {
+              // The merged view is addressed by a reserved id that has no backend row.
+              const isMerged = isMergedBackendId(msg.backendId);
+              const backend = isMerged ? null : this.db.getBackend(msg.backendId);
+              if (isMerged || backend) {
                 if (clientInfo.backendId !== msg.backendId) {
                   clientInfo.backendId = msg.backendId;
                   changed = true;
@@ -927,6 +930,9 @@ export class StatsWebSocketServer {
   }
 
   private resolveBackendId(rawBackendId: number | null): number | null {
+    if (isMergedBackendId(rawBackendId)) {
+      return MERGED_BACKEND_ID;
+    }
     if (rawBackendId !== null) {
       return this.db.getBackend(rawBackendId) ? rawBackendId : null;
     }
@@ -1245,7 +1251,13 @@ export class StatsWebSocketServer {
         const resolvedBackendId = this.resolveBackendId(clientInfo.backendId);
         if (resolvedBackendId === null) continue;
 
-        if (changedBackendId !== undefined && resolvedBackendId !== changedBackendId) {
+        // A merged subscriber follows every member backend, so any backend's
+        // traffic counts as its own.
+        if (
+          changedBackendId !== undefined &&
+          resolvedBackendId !== changedBackendId &&
+          !isMergedBackendId(resolvedBackendId)
+        ) {
           continue;
         }
 
@@ -1396,8 +1408,10 @@ export class StatsWebSocketServer {
 
   clearBackendCache(backendId: number): void {
     const cachePrefix = `${backendId}|`;
+    // Merged entries are built from every member, so they go stale with any backend.
+    const mergedPrefix = `${MERGED_BACKEND_ID}|`;
     for (const key of this.baseSummaryCache.keys()) {
-      if (key.startsWith(cachePrefix)) {
+      if (key.startsWith(cachePrefix) || key.startsWith(mergedPrefix)) {
         this.baseSummaryCache.delete(key);
       }
     }

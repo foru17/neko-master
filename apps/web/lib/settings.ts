@@ -4,12 +4,21 @@ import { useCallback, useSyncExternalStore } from "react";
 
 export type FaviconProvider = "google" | "faviconim" | "off";
 
+/**
+ * What the dashboard shows while several backends are collecting: the active
+ * backend, or every collecting backend merged. The choice is remembered;
+ * "merged" only takes effect with two or more collecting backends.
+ */
+export type BackendView = "single" | "merged";
+
 export interface UserSettings {
   faviconProvider: FaviconProvider;
+  backendView: BackendView;
 }
 
 const DEFAULT_SETTINGS: UserSettings = {
   faviconProvider: "faviconim",
+  backendView: "merged",
 };
 
 const STORAGE_KEY = "neko-master-settings";

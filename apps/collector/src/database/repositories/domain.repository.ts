@@ -329,6 +329,42 @@ export class DomainRepository extends BaseRepository {
   }
 
   /**
+   * Count distinct domains across several backends (merged view).
+   * Mirrors the count statements of getDomainStatsPaginated with
+   * `backend_id IN (...)`, so a domain seen on two backends is counted once.
+   */
+  countDomainsAcrossBackends(
+    backendIds: number[],
+    opts: { search?: string; start?: string; end?: string } = {},
+  ): number {
+    if (backendIds.length === 0) return 0;
+    const search = opts.search?.trim() || '';
+    const placeholders = backendIds.map(() => '?').join(', ');
+    const searchParams: string[] = search ? [`%${search}%`] : [];
+    const whereSearch = search ? 'AND domain LIKE ?' : '';
+    const range = this.parseMinuteRange(opts.start, opts.end);
+
+    if (range) {
+      const resolved = this.resolveFactTable(opts.start!, opts.end!);
+      const stmt = this.db.prepare(`
+        SELECT COUNT(*) as total
+        FROM (
+          SELECT domain
+          FROM ${resolved.table}
+          WHERE backend_id IN (${placeholders}) AND ${resolved.timeCol} >= ? AND ${resolved.timeCol} <= ? AND domain != '' ${whereSearch}
+          GROUP BY domain
+        )
+      `);
+      return (stmt.get(...backendIds, resolved.startKey, resolved.endKey, ...searchParams) as { total: number }).total;
+    }
+
+    const stmt = this.db.prepare(
+      `SELECT COUNT(DISTINCT domain) as total FROM domain_stats WHERE backend_id IN (${placeholders}) ${whereSearch}`,
+    );
+    return (stmt.get(...backendIds, ...searchParams) as { total: number }).total;
+  }
+
+  /**
    * Get IP details for a specific domain
    */
   getDomainIPDetails(

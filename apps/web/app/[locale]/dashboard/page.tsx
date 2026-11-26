@@ -27,6 +27,7 @@ export default function DashboardPage() {
     activeBackend,
     listeningBackends,
     activeBackendId,
+    isMergedView,
     backendStatus,
     backendStatusHint,
     queryError,
@@ -41,6 +42,7 @@ export default function DashboardPage() {
     handleTimeRangeChange,
     handleSwitchBackend,
     handleBackendChange,
+    setBackendView,
     refreshNow,
 
     // Theme
@@ -71,6 +73,7 @@ export default function DashboardPage() {
           backends={backends}
           activeBackend={activeBackend}
           listeningBackends={listeningBackends}
+          isMergedView={isMergedView}
           backendStatus={backendStatus}
           backendStatusHint={backendStatusHint}
           activeTab={activeTab}
@@ -122,6 +125,7 @@ export default function DashboardPage() {
           handleBackendChange();
         }}
         onBackendChange={handleBackendChange}
+        onSetActive={() => setBackendView("single")}
       />
 
       {/* About Dialog */}
