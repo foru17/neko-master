@@ -20,7 +20,7 @@ import { TrafficWriteError } from '../clickhouse/clickhouse.writer.js';
 
 // Import modules
 import { BackendService, backendController } from '../backend/index.js';
-import { StatsService, statsController } from '../stats/index.js';
+import { MergedAwareStatsService, StatsService, statsController } from '../stats/index.js';
 import { AuthService, authController } from '../auth/index.js';
 import { configController } from '../config/index.js';
 import { gatewayFetch } from '../../shared/utils/gateway-fetch.js';
@@ -348,7 +348,7 @@ export async function createApp(options: AppOptions) {
     authService,
     handleBackendDataCleared,
   );
-  const statsService = new StatsService(db, realtimeStore);
+  const statsService = new MergedAwareStatsService(db, realtimeStore);
 
   // Decorate Fastify instance with services
   app.decorate('backendService', backendService);

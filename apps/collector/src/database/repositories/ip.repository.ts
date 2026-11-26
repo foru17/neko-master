@@ -281,6 +281,41 @@ export class IPRepository extends BaseRepository {
     return { data, total };
   }
 
+  /**
+   * Count distinct IPs across several backends (merged view).
+   * Mirrors the count statements of getIPStatsPaginated with
+   * `backend_id IN (...)`, so an address seen on two backends is counted once.
+   */
+  countIPsAcrossBackends(
+    backendIds: number[],
+    opts: { search?: string; start?: string; end?: string } = {},
+  ): number {
+    if (backendIds.length === 0) return 0;
+    const search = opts.search?.trim() || '';
+    const placeholders = backendIds.map(() => '?').join(', ');
+    const searchParams: string[] = search ? [`%${search}%`, `%${search}%`] : [];
+    const range = this.parseMinuteRange(opts.start, opts.end);
+
+    if (range) {
+      const resolved = this.resolveFactTable(opts.start!, opts.end!);
+      const whereSearch = search ? "AND (ip LIKE ? OR domain LIKE ?)" : "";
+      const stmt = this.db.prepare(`
+        SELECT COUNT(*) as total FROM (
+          SELECT ip FROM ${resolved.table}
+          WHERE backend_id IN (${placeholders}) AND ${resolved.timeCol} >= ? AND ${resolved.timeCol} <= ? AND ip != '' ${whereSearch}
+          GROUP BY ip
+        )
+      `);
+      return (stmt.get(...backendIds, resolved.startKey, resolved.endKey, ...searchParams) as { total: number }).total;
+    }
+
+    const whereStatsSearch = search ? "AND (i.ip LIKE ? OR i.domains LIKE ?)" : "";
+    const stmt = this.db.prepare(
+      `SELECT COUNT(DISTINCT i.ip) as total FROM ip_stats i WHERE i.backend_id IN (${placeholders}) AND i.ip != '' ${whereStatsSearch}`,
+    );
+    return (stmt.get(...backendIds, ...searchParams) as { total: number }).total;
+  }
+
   getDomainIPDetails(
     backendId: number, domain: string, start?: string, end?: string,
     limit = 100, sourceIP?: string, sourceChain?: string,

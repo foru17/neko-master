@@ -529,6 +529,28 @@ WebSocket: ClientInfo.backendId
 └── Backend #3: Surge (HTTP 轮询)
 ```
 
+### 合并视图 (Merged View)
+
+```
+保留 ID MERGED_BACKEND_ID = -1 表示「所有 enabled + listening 的后端合并」
+（真实 ID 来自 AUTOINCREMENT，恒为正，不会冲突）
+
+HTTP  /api/stats/*?backendId=-1      ─┐
+WebSocket  subscribe {backendId:-1}  ─┴─> MergedAwareStatsService (extends StatsService)
+                                           │ 普通后端 ID：原样走父类实现，行为不变
+                                           │ -1：对每个成员后端调用父类同名方法
+                                           ▼
+                                   stats.merge.ts（纯函数，不访问数据库）
+                                     按 key 合并：流量计数求和、lastSeen 取最大、字符串列表取并集
+                                     覆盖域名 / IP / 设备 / 代理 / 规则 / 国家 / 时序 / 规则链路图
+
+去重计数（域名数、IP 数、分页 total）：
+  backend_id IN (...) 的 COUNT，SQLite 与 ClickHouse 各一份，
+  走范围缓存，任一后端 flush 时失效
+```
+
+广播：合并订阅者接收任一成员后端的流量推送；`clearBackendCache(backendId)` 同时清掉 `-1|…` 的缓存条目。
+
 ### 防重复计算模式 (Surge)
 
 ```

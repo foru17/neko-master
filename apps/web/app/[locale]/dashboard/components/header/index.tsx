@@ -37,6 +37,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { TimeRangePicker, LanguageSwitcher, ThemeToggle, ClientOnly } from "@/components/common";
 import { cn } from "@/lib/utils";
+import { MERGED_BACKEND_ID } from "@neko-master/shared";
 import type { TimeRange } from "@/lib/api";
 import type { BackendStatus, TabId, TimePreset } from "@/lib/types/dashboard";
 
@@ -64,6 +65,8 @@ interface HeaderProps {
   backends: Backend[];
   activeBackend: Backend | null;
   listeningBackends: Backend[];
+  /** True while the dashboard shows every collecting backend combined. */
+  isMergedView: boolean;
   backendStatus: BackendStatus;
   backendStatusHint: string | null;
 
@@ -107,6 +110,7 @@ export function Header({
   backends,
   activeBackend,
   listeningBackends,
+  isMergedView,
   backendStatus,
   backendStatusHint,
   timeRange,
@@ -182,7 +186,9 @@ export function Header({
                 >
                   <Server className="w-4 h-4" />
                   <span className="max-w-[80px] sm:max-w-[120px] truncate">
-                    {activeBackend?.name || backendT("selectBackend")}
+                    {isMergedView
+                      ? backendT("allBackends")
+                      : activeBackend?.name || backendT("selectBackend")}
                   </span>
                   <ChevronDown className="w-3 h-3" />
                 </Button>
@@ -190,9 +196,30 @@ export function Header({
               <DropdownMenuContent align="start" className="w-56">
                 <DropdownMenuLabel>{backendT("backendsTab")}</DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                {listeningBackends.length > 1 && (
+                  <>
+                    <DropdownMenuItem
+                      onClick={() => onSwitchBackend(MERGED_BACKEND_ID)}
+                      title={backendT("mergedHint")}
+                      className={cn("flex items-center justify-between", isMergedView && "bg-accent")}
+                    >
+                      <span className={cn("truncate", isMergedView && "font-medium")}>
+                        {backendT("allBackends")}
+                      </span>
+                      {isMergedView && (
+                        <Badge variant="default" className="text-[10px] h-5">
+                          {backendT("merged")}
+                        </Badge>
+                      )}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
                 {listeningBackends.map((backend) => {
                   const healthStatus = backend.health?.status;
                   const isUnhealthy = healthStatus === 'unhealthy';
+                  // While merged, no single backend is the one on display.
+                  const isDisplayed = !!backend.is_active && !isMergedView;
                   
                   return (
                     <DropdownMenuItem
@@ -207,7 +234,7 @@ export function Header({
                         <span
                           className={cn(
                             "truncate",
-                            backend.is_active && "font-medium"
+                            isDisplayed && "font-medium"
                           )}
                         >
                           {backend.name}
@@ -217,7 +244,7 @@ export function Header({
                         )}
                       </div>
                       <div className="flex items-center gap-1">
-                        {!!backend.is_active && (
+                        {isDisplayed && (
                           <Badge
                             variant="default"
                             className={cn(
@@ -228,7 +255,7 @@ export function Header({
                             {isUnhealthy ? backendT("unhealthy") : backendT("displaying")}
                           </Badge>
                         )}
-                        {!!backend.listening && !backend.is_active && (
+                        {!!backend.listening && !isDisplayed && (
                           <Badge
                             variant="secondary"
                             className={cn(

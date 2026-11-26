@@ -1,4 +1,5 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { isMergedBackendId } from "@neko-master/shared";
 import { api, type TimeRange } from "@/lib/api";
 import {
   getRulesQueryKey,
@@ -84,15 +85,18 @@ export function useGatewayRules({
   activeBackendId,
   enabled = true,
 }: UseGatewayRulesOptions) {
+  // Live gateway rules belong to a single gateway, so the merged view has
+  // none and must not borrow the previous backend's data as a placeholder.
+  const isMerged = isMergedBackendId(activeBackendId);
   return useQuery({
     queryKey: ["rules", "gateway", { backendId: activeBackendId }],
     queryFn: () => {
       if (!activeBackendId) throw new Error("Backend ID is required");
       return api.getGatewayRules(activeBackendId);
     },
-    enabled: !!activeBackendId && enabled,
+    enabled: !!activeBackendId && enabled && !isMerged,
 
     staleTime: QUERY_CONFIG.STALE_TIME.STATIC,
-    placeholderData: keepPreviousData,
+    placeholderData: isMerged ? undefined : keepPreviousData,
   });
 }

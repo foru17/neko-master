@@ -13,7 +13,7 @@ let wsServer: StatsWebSocketServer;
 
 import { APIServer } from './modules/app/app.js';
 import { GeoIPService } from './modules/geo/geo.service.js';
-import { StatsService } from './modules/stats/index.js';
+import { MergedAwareStatsService } from './modules/stats/index.js';
 import {
   ensureClickHouseReady,
   ensureClickHouseSchema,
@@ -86,7 +86,7 @@ async function main() {
 
   // Initialize WebSocket server for real-time updates
   console.log('[Main] Starting WebSocket server on port', COLLECTOR_WS_PORT);
-  const statsService = new StatsService(db, realtimeStore);
+  const statsService = new MergedAwareStatsService(db, realtimeStore);
   wsServer = new StatsWebSocketServer(COLLECTOR_WS_PORT, db, statsService);
   wsServer.start();
   // Persisted totals are cached for a few seconds; when a flush moves

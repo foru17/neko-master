@@ -530,6 +530,29 @@ Support mixed backends:
 └── Backend #3: Surge (HTTP polling)
 ```
 
+### Merged View
+
+```
+The reserved id MERGED_BACKEND_ID = -1 means "every enabled + listening backend, merged"
+(real ids come from AUTOINCREMENT and are always positive, so it cannot collide)
+
+HTTP  /api/stats/*?backendId=-1      ─┐
+WebSocket  subscribe {backendId:-1}  ─┴─> MergedAwareStatsService (extends StatsService)
+                                           │ normal backend id: parent implementation, unchanged
+                                           │ -1: the same parent method for every member backend
+                                           ▼
+                                   stats.merge.ts (pure functions, no database access)
+                                     merge by key: counters summed, latest lastSeen, string lists unioned
+                                     covers domains / IPs / devices / proxies / rules / countries /
+                                     time series / the rule chain graph
+
+Distinct counts (domain count, IP count, page totals):
+  COUNT over backend_id IN (...), one implementation each for SQLite and ClickHouse,
+  range-cached and invalidated by a flush of any backend
+```
+
+Broadcasts: a merged subscriber receives the pushes of every member backend, and `clearBackendCache(backendId)` also drops the `-1|…` cache entries.
+
 ### Duplicate Prevention Pattern (Surge)
 
 ```
